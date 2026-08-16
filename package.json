@@ -1,0 +1,40 @@
+{
+  "name": "agentflow",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Autonomous procurement layer for AI agents using x402 on Algorand",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:shared": "npm -w packages/shared run build",
+    "build:api": "npm -w apps/api run build",
+    "build:web": "npm -w apps/web run build",
+    "build": "npm run build:shared && npm run build:api && npm run build:web",
+    "dev:api": "npm -w apps/api run dev",
+    "dev:web": "npm -w apps/web run dev",
+    "dev": "npm run build:shared && concurrently -n api,web -c green,magenta \"npm run dev:api\" \"npm run dev:web\"",
+    "test": "npm run build:shared && vitest run",
+    "test:watch": "npm run build:shared && vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "npm run build:shared && tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/supertest": "^6.0.0",
+    "concurrently": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "supertest": "^7.0.0",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.1.0"
+  }
+}
