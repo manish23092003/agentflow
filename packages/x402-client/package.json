@@ -1,0 +1,19 @@
+{
+  "name": "@agentflow/x402-client",
+  "version": "1.0.0",
+  "description": "Reusable x402 payment client SDK for AgentFlow",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@x402/avm": "^2.22.0",
+    "@x402/fetch": "^2.22.0",
+    "algosdk": "^3.6.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

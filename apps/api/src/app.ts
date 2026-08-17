@@ -33,9 +33,12 @@ app.use(cors({
 app.use(express.json({ limit: "100kb" }));
 app.use(requestIdMiddleware);
 
+import agentRouter from "./routes/agent.js";
+
 // --- API routes (versioned) ---
 app.use("/api/v1", healthRouter);
 app.use("/api/v1", readyRouter);
+app.use("/api/v1/agent", agentRouter);
 
 // --- 404 Not Found Handler ---
 app.use((req, res, _next) => {

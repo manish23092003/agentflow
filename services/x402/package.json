@@ -1,0 +1,30 @@
+{
+  "name": "@agentflow/x402",
+  "version": "1.0.0",
+  "description": "x402 Proof of Concept for AgentFlow",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "client:unpaid": "tsx src/client/unpaid-client.ts",
+    "client:paid": "tsx src/client/paid-client.ts",
+    "lint": "eslint \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@x402-avm/extensions": "^2.6.1",
+    "@x402/avm": "^2.22.0",
+    "@x402/core": "^2.22.0",
+    "@x402/fetch": "^2.22.0",
+    "@x402/hono": "^2.22.0",
+    "algosdk": "^3.6.0",
+    "hono": "^4.6.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}

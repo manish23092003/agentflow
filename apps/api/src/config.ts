@@ -1,5 +1,8 @@
 import type { LogLevel } from "@agentflow/shared";
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 /**
  * Centralized application configuration.
  * All environment variables are read here — never scattered through application code.

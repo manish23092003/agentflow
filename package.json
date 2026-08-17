@@ -10,21 +10,24 @@
   },
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "services/*"
   ],
   "scripts": {
     "build:shared": "npm -w packages/shared run build",
     "build:api": "npm -w apps/api run build",
     "build:web": "npm -w apps/web run build",
-    "build": "npm run build:shared && npm run build:api && npm run build:web",
+    "build:x402": "npm -w services/x402 run build",
+    "build": "npm run build:shared && npm run build:api && npm run build:web && npm run build:x402",
     "dev:api": "npm -w apps/api run dev",
     "dev:web": "npm -w apps/web run dev",
-    "dev": "npm run build:shared && concurrently -n api,web -c green,magenta \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:x402": "npm -w services/x402 run dev",
+    "dev": "npm run build:shared && concurrently -n api,web,x402 -c green,magenta,blue \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:x402\"",
     "test": "npm run build:shared && vitest run",
     "test:watch": "npm run build:shared && vitest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "npm run build:shared && tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json"
+    "typecheck": "npm run build:shared && tsc --noEmit -p apps/api/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p services/x402/tsconfig.json"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
