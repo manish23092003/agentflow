@@ -1,17 +1,24 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PolicyEngine } from './PolicyEngine.js';
-import type { PaymentRepository } from '../db/PaymentHistory.js';
 import type { UserSpendingPolicy } from './types.js';
 import type { PaymentRequiredSummary } from '@agentflow/x402-client';
 
 describe('PolicyEngine', () => {
-  const mockDb: PaymentRepository = {
-    createPayment: vi.fn(),
-    getPayments: vi.fn().mockResolvedValue([]),
-    updateStatus: vi.fn()
-  };
-
-  const engine = new PolicyEngine(mockDb);
+  let mockDb: unknown;
+  let engine: PolicyEngine;
+  
+  beforeEach(() => {
+    mockDb = {
+      createPayment: vi.fn(),
+      getPayments: vi.fn().mockResolvedValue([]),
+      getPaymentById: vi.fn(),
+      updateStatus: vi.fn(),
+      createApprovalRequest: vi.fn(),
+      getApprovalRequest: vi.fn(),
+      updateApprovalRequest: vi.fn(),
+    };
+    engine = new PolicyEngine(mockDb);
+  });
 
   const basePolicy: UserSpendingPolicy = {
     maxPerTransaction: 100000,

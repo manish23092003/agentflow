@@ -34,11 +34,13 @@ app.use(express.json({ limit: "100kb" }));
 app.use(requestIdMiddleware);
 
 import agentRouter from "./routes/agent.js";
+import approvalsRouter from "./routes/approvals.js";
 
 // --- API routes (versioned) ---
 app.use("/api/v1", healthRouter);
 app.use("/api/v1", readyRouter);
 app.use("/api/v1/agent", agentRouter);
+app.use("/api/v1/agent", approvalsRouter);
 
 // --- 404 Not Found Handler ---
 app.use((req, res, _next) => {

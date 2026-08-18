@@ -12,6 +12,7 @@ export interface AppConfig {
   env: string;
   version: string;
   logLevel: LogLevel;
+  geminiApiKey: string;
 }
 
 export const config: AppConfig = {
@@ -19,4 +20,11 @@ export const config: AppConfig = {
   env: process.env.NODE_ENV || "development",
   version: process.env.npm_package_version || "0.0.1",
   logLevel: (process.env.LOG_LEVEL as LogLevel) || "info",
+  geminiApiKey: (() => {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error('GEMINI_API_KEY environment variable is not set');
+    }
+    return key;
+  })(),
 };

@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model UserSpendingPolicy {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  maxPerTransaction    Int
+  dailyLimit           Int
+  // Stored as JSON string since SQLite doesn't support arrays
+  allowedAssets        String
+  // Stored as JSON string since SQLite doesn't support arrays
+  allowedNetworks      String
+  requireApprovalAbove Int
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model PaymentRecord {
+  id                   String   @id @default(uuid())
+  transactionId        String?  // Optional until settlement
+  amount               Int
+  asset                String
+  receiver             String
+  network              String
+  decision             String   // APPROVED | DENIED | REQUIRES_APPROVAL
+  status               String   // PENDING | SUCCESS | FAILED
+  agentAction          String
+  createdAt            DateTime @default(now())
+}
+
+model AgentSession {
+  id                   String   @id @default(uuid())
+  userId               String
+  conversationId       String   @unique
+  status               String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model ApprovalRequest {
+  id                   String   @id @default(uuid())
+  paymentRecordId      String   @unique
+  status               String   // PENDING | APPROVED | REJECTED | EXPIRED | CANCELLED
+  resourceUrl          String
+  amount               Int
+  asset                String
+  network              String
+  payTo                String
+  reason               String
+  requestedAt          DateTime @default(now())
+  expiresAt            DateTime
+  approvedAt           DateTime?
+  rejectedAt           DateTime?
+  resolvedBy           String?
+  resolutionReason     String?
+}

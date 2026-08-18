@@ -1,26 +1,35 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PaymentTool } from './PaymentTool.js';
-import type { PaymentRepository } from '../db/PaymentHistory.js';
-import type { PolicyEngine } from './PolicyEngine.js';
-import type { SigningService } from '../security/SigningService.js';
 import type { PolicyDecision } from './types.js';
 
 describe('PaymentTool', () => {
-  const mockDb: PaymentRepository = {
-    createPayment: vi.fn().mockResolvedValue({ id: '123' }),
-    getPayments: vi.fn(),
-    updateStatus: vi.fn()
-  };
+  let mockDb: unknown;
+  let mockPolicyEngine: unknown;
+  let mockSigningService: unknown;
+  let tool: PaymentTool;
 
-  const mockPolicyEngine = {
-    evaluate: vi.fn()
-  } as unknown as PolicyEngine;
-
-  const mockSigningService = {
-    executeAuthorizedPayment: vi.fn()
-  } as unknown as SigningService;
-
-  const tool = new PaymentTool(mockDb, mockPolicyEngine, mockSigningService);
+  beforeEach(() => {
+    mockDb = {
+      createPayment: vi.fn().mockResolvedValue({ id: '123' }),
+      getPayments: vi.fn(),
+      getPaymentById: vi.fn(),
+      updateStatus: vi.fn(),
+      createApprovalRequest: vi.fn(),
+      getApprovalRequest: vi.fn(),
+      updateApprovalRequest: vi.fn(),
+    };
+    mockPolicyEngine = {
+      evaluate: vi.fn()
+    };
+    mockSigningService = {
+      executeAuthorizedPayment: vi.fn()
+    };
+    tool = new PaymentTool(
+      mockDb as import('../db/PaymentHistory.js').PaymentRepository,
+      mockPolicyEngine as import('./PolicyEngine.js').PolicyEngine,
+      mockSigningService as import('../security/SigningService.js').SigningService
+    );
+  });
 
   const dummyPolicy = {
     maxPerTransaction: 100,

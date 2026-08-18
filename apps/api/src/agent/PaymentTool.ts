@@ -4,6 +4,21 @@ import type { PolicyEngine } from './PolicyEngine.js';
 import type { UserSpendingPolicy } from './types.js';
 import type { SigningService } from '../security/SigningService.js';
 
+export class ApprovalRequiredError extends Error {
+  constructor(public payload: {
+    approvalId: string;
+    reason: string;
+    resource: string;
+    amount: string;
+    asset: string;
+    network: string;
+    budgetRemaining: string;
+  }) {
+    super('Agent flow suspended: Payment REQUIRES_APPROVAL');
+    this.name = 'ApprovalRequiredError';
+  }
+}
+
 export class PaymentTool {
   constructor(
     private readonly db: PaymentRepository,
@@ -18,7 +33,17 @@ export class PaymentTool {
     url: string,
     policy: UserSpendingPolicy,
     agentActionContext: string
-  ): Promise<{ data: string; paymentExecuted: boolean; logs: string[] }> {
+  ): Promise<{ 
+    data: string; 
+    paymentExecuted: boolean; 
+    logs: string[];
+    metadata?: {
+      amount?: string;
+      asset?: string;
+      network?: string;
+      transactionId?: string;
+    }
+  }> {
     const logs: string[] = [];
     logs.push(`[Agent] Attempting to fetch resource: ${url}`);
 
@@ -48,8 +73,47 @@ export class PaymentTool {
     const decision = await this.policyEngine.evaluate(requirement, policy);
     logs.push(`[PolicyEngine] Decision: ${decision.decision}. Reason: ${decision.reason}`);
 
-    if (decision.decision !== 'APPROVED') {
-      throw new Error(`Agent flow aborted: Payment was ${decision.decision}. Reason: ${decision.reason}`);
+    if (decision.decision === 'DENIED') {
+      throw new Error(`Agent flow aborted: Payment was DENIED. Reason: ${decision.reason}`);
+    }
+
+    if (decision.decision === 'REQUIRES_APPROVAL') {
+      logs.push(`[Agent] Payment requires human approval. Creating approval request...`);
+      const record = await this.db.createPayment({
+        resource: url,
+        amount: requirement.rawAmount,
+        asset: requirement.asset,
+        receiver: 'extracted-from-header-or-config',
+        network: requirement.network,
+        decision: decision.decision,
+        status: 'PENDING_APPROVAL',
+        agentAction: agentActionContext
+      });
+
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1); // 1 hour expiry
+
+      const approval = await this.db.createApprovalRequest({
+        paymentRecordId: record.id,
+        status: 'PENDING',
+        resourceUrl: url,
+        amount: requirement.rawAmount,
+        asset: requirement.asset,
+        network: requirement.network,
+        payTo: 'extracted-from-header-or-config', // Ideally derived from requirement
+        reason: decision.reason,
+        expiresAt: expiresAt.toISOString()
+      });
+
+      throw new ApprovalRequiredError({
+        approvalId: approval.id,
+        reason: decision.reason,
+        resource: url,
+        amount: requirement.rawAmount.toString(),
+        asset: requirement.asset,
+        network: requirement.network,
+        budgetRemaining: 'Check policy limits' // Calculate if needed, but placeholder is fine per requirements
+      });
     }
 
     // 4. Log Pending Transaction to DB
@@ -84,7 +148,13 @@ export class PaymentTool {
       return {
         data: await paidResponse.text(),
         paymentExecuted: true,
-        logs
+        logs,
+        metadata: {
+          amount: requirement.rawAmount.toString(),
+          asset: requirement.asset,
+          network: requirement.network,
+          transactionId: paymentIdentifier || undefined
+        }
       };
     } catch (e: unknown) {
       await this.db.updateStatus(record.id, { status: 'FAILED' });
