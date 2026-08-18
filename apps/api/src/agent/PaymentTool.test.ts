@@ -3,9 +3,12 @@ import { PaymentTool } from './PaymentTool.js';
 import type { PolicyDecision } from './types.js';
 
 describe('PaymentTool', () => {
-  let mockDb: unknown;
-  let mockPolicyEngine: unknown;
-  let mockSigningService: unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockDb: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockPolicyEngine: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockSigningService: any;
   let tool: PaymentTool;
 
   beforeEach(() => {

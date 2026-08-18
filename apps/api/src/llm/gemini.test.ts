@@ -17,7 +17,7 @@ describe('GeminiProvider', () => {
 
   it('initializes correctly with default model', () => {
     const provider = new GeminiProvider('test-api-key');
-    expect(provider.modelName).toBe('gemini-1.5-pro');
+    expect(provider.modelName).toBe('gemini-3.6-flash');
     const model = provider.getModel();
     expect(model).toBeDefined();
     expect(model).toEqual({ id: 'mock-model' });

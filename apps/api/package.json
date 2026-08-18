@@ -13,11 +13,11 @@
     "@agentflow/x402-client": "^1.0.0",
     "@ai-sdk/google": "^4.0.44",
     "@prisma/client": "^5.22.0",
-    "ai": "^3.4.33",
+    "ai": "^7.0.66",
     "cors": "^2.8.6",
     "express": "^5.0.0",
     "helmet": "^8.3.0",
-    "zod": "3"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

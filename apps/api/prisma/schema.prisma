@@ -32,6 +32,9 @@ model PaymentRecord {
   status               String   // PENDING | SUCCESS | FAILED
   agentAction          String
   createdAt            DateTime @default(now())
+
+  researchSessionId    String?
+  ResearchSession      ResearchSession? @relation(fields: [researchSessionId], references: [id])
 }
 
 model AgentSession {
@@ -59,4 +62,83 @@ model ApprovalRequest {
   rejectedAt           DateTime?
   resolvedBy           String?
   resolutionReason     String?
+}
+
+// ----------------------------------------
+// Phase 6: Autonomous Research Models
+// ----------------------------------------
+
+model ResearchSession {
+  id              String   @id @default(uuid())
+  userId          String
+  goal            String
+  status          String   // See State Machine below
+  
+  researchBudget  Int      @default(0) // Integer base units (e.g. 200000 for $0.20)
+  spent           Int      @default(0) // Tracked total spent
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  failureReason   String?
+  
+  citations       Citation[]
+  payments        PaymentRecord[] // Related payments for expense tracking
+  recommendations PaidResourceRecommendation[]
+  gaps            ResearchGap[]
+}
+
+model Citation {
+  id                String   @id @default(uuid())
+  researchSessionId String
+  url               String
+  title             String?
+  snippet           String?
+  
+  sourceType        String   // "WEB_SEARCH", "X402_RESOURCE"
+  provider          String   // e.g. "Tavily", "MockSearch", "x402-bazaar"
+  retrievedAt       DateTime @default(now())
+  relevanceScore    Float?
+  contentHash       String?
+  
+  isPaid            Boolean  @default(false)
+  cost              Int      @default(0)
+  purchaseId        String?  // Links to PaymentRecord if paid
+  
+  ResearchSession   ResearchSession @relation(fields: [researchSessionId], references: [id])
+}
+
+model PaidResourceRecommendation {
+  id                String   @id @default(uuid())
+  researchSessionId String
+  
+  service           String
+  serviceUrl        String
+  price             Int
+  asset             String
+  network           String
+  
+  reason            String
+  relevanceScore    Float?
+  expectedValue     String
+  alternative       String
+  
+  status            String   // e.g. PENDING, APPROVED, REJECTED
+  createdAt         DateTime @default(now())
+  
+  ResearchSession   ResearchSession @relation(fields: [researchSessionId], references: [id])
+}
+
+model ResearchGap {
+  id                  String   @id @default(uuid())
+  researchSessionId   String
+  hasMaterialGap      Boolean
+  missingInformation  String   // JSON string array
+  importance          String   // LOW, MEDIUM, HIGH
+  evidenceSummary     String
+  recommendedAction   String   // CONTINUE_FREE, DISCOVER_PAID
+  evidenceCitationIds String   // JSON string array
+  createdAt           DateTime @default(now())
+
+  ResearchSession     ResearchSession @relation(fields: [researchSessionId], references: [id])
 }

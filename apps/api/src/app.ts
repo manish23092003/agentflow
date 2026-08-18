@@ -35,12 +35,14 @@ app.use(requestIdMiddleware);
 
 import agentRouter from "./routes/agent.js";
 import approvalsRouter from "./routes/approvals.js";
+import researchRouter from "./routes/research.js";
 
 // --- API routes (versioned) ---
 app.use("/api/v1", healthRouter);
 app.use("/api/v1", readyRouter);
 app.use("/api/v1/agent", agentRouter);
 app.use("/api/v1/agent", approvalsRouter);
+app.use("/api/v1/research", researchRouter);
 
 // --- 404 Not Found Handler ---
 app.use((req, res, _next) => {

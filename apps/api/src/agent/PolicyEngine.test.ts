@@ -4,7 +4,8 @@ import type { UserSpendingPolicy } from './types.js';
 import type { PaymentRequiredSummary } from '@agentflow/x402-client';
 
 describe('PolicyEngine', () => {
-  let mockDb: unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockDb: any;
   let engine: PolicyEngine;
   
   beforeEach(() => {

@@ -21,7 +21,7 @@ const paymentTool = new PaymentTool(db, policyEngine, signingService);
 const mockAgent = new MockAgent(paymentTool);
 
 // New LLM Agent
-const geminiProvider = new GeminiProvider(config.geminiApiKey);
+const geminiProvider = new GeminiProvider(config.geminiApiKey, config.geminiModel);
 const llmAgent = new LlmAgent(geminiProvider, paymentTool);
 
 router.post('/procure', async (req, res) => {

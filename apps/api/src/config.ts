@@ -13,6 +13,15 @@ export interface AppConfig {
   version: string;
   logLevel: LogLevel;
   geminiApiKey: string;
+  geminiModel: string;
+  tavilyApiKey?: string;
+  x402: {
+    facilitatorUrl: string;
+    network: string;
+  };
+  algorand: {
+    usdcAssetId: string;
+  };
 }
 
 export const config: AppConfig = {
@@ -27,4 +36,13 @@ export const config: AppConfig = {
     }
     return key;
   })(),
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+  tavilyApiKey: process.env.TAVILY_API_KEY,
+  x402: {
+    facilitatorUrl: process.env.X402_FACILITATOR_URL || 'https://facilitator.goplausible.xyz/',
+    network: `algorand:${process.env.ALGORAND_NETWORK || 'testnet'}`
+  },
+  algorand: {
+    usdcAssetId: process.env.X402_USDC_ASSET_ID || '10458941'
+  }
 };

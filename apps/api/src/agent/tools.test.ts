@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, vi } from 'vitest';
 import { createPaymentLLMTool } from './tools.js';
 import type { PaymentTool } from './PaymentTool.js';

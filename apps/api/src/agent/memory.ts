@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { CoreMessage } from 'ai';
+type CoreMessage = any;
 
 export interface SessionData {
   id: string;

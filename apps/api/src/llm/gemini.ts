@@ -6,7 +6,7 @@ export class GeminiProvider implements LLMProvider {
   private readonly google: ReturnType<typeof createGoogleGenerativeAI>;
   private readonly model: LanguageModel;
 
-  constructor(apiKey: string, public readonly modelName: string = 'gemini-1.5-pro') {
+  constructor(apiKey: string, public readonly modelName: string = 'gemini-3.6-flash') {
     this.google = createGoogleGenerativeAI({
       apiKey,
     });

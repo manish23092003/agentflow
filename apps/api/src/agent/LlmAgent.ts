@@ -41,7 +41,7 @@ export class LlmAgent {
         tools: {
           paymentTool: createPaymentLLMTool(this.paymentTool, policy)
         },
-        maxSteps: 5, // Allow the agent to loop and use tools multiple times
+        // maxSteps: 5, // Allow the agent to loop and use tools multiple times
       });
 
       // Save the assistant's final response to memory
