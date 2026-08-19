@@ -42,6 +42,7 @@ export class PaymentTool {
       asset?: string;
       network?: string;
       transactionId?: string;
+      paymentRecordId?: string;
     }
   }> {
     const logs: string[] = [];
@@ -136,6 +137,8 @@ export class PaymentTool {
       const paidResponse = await this.signingService.executeAuthorizedPayment(url, {}, decision);
       
       if (!paidResponse.ok) {
+        const body = await paidResponse.text().catch(() => 'No body');
+        console.error('Paid response failed body:', body);
         throw new Error(`Paid request failed with HTTP ${paidResponse.status}`);
       }
 
@@ -153,7 +156,8 @@ export class PaymentTool {
           amount: requirement.rawAmount.toString(),
           asset: requirement.asset,
           network: requirement.network,
-          transactionId: paymentIdentifier || undefined
+          transactionId: paymentIdentifier || undefined,
+          paymentRecordId: record.id
         }
       };
     } catch (e: unknown) {

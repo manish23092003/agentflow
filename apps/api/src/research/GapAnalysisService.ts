@@ -37,10 +37,9 @@ export class GapAnalysisService {
         this.repository,
         sessionId,
         ResearchState.EVALUATING_GAPS,
-        ResearchState.FAILED,
-        'NO_EVIDENCE_FOR_GAP_ANALYSIS'
+        ResearchState.FAILED
       );
-      return;
+      throw new Error('NO_EVIDENCE_FOR_GAP_ANALYSIS');
     }
 
     const citationText = citations.map(c => `[ID: ${c.id}] Title: ${c.title || 'N/A'}\nSnippet: ${c.snippet || 'N/A'}`).join('\n\n');
@@ -99,14 +98,13 @@ A material gap means quantitative data or critical facts are missing to fully an
       await ResearchStateMachine.transition(this.repository, sessionId, ResearchState.EVALUATING_GAPS, nextState);
 
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       await ResearchStateMachine.transition(
         this.repository,
         sessionId,
         ResearchState.EVALUATING_GAPS,
-        ResearchState.FAILED,
-        message || 'GAP_ANALYSIS_FAILED'
+        ResearchState.FAILED
       );
+      throw error;
     }
   }
 }

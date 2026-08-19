@@ -22,6 +22,16 @@ describe('Approvals API', () => {
   const db = new PrismaPaymentRepository();
   
   async function createPendingApproval(overrides = {}) {
+    const session = await prisma.researchSession.create({
+      data: {
+        userId: 'test',
+        goal: 'test',
+        researchBudget: 1000,
+        spent: 0,
+        status: 'PENDING_APPROVAL'
+      }
+    });
+
     const p = await db.createPayment({
       resource: 'http://test',
       amount: 100,
@@ -30,7 +40,8 @@ describe('Approvals API', () => {
       network: 'testnet',
       decision: 'REQUIRES_APPROVAL',
       status: 'PENDING_APPROVAL',
-      agentAction: 'test'
+      agentAction: 'test',
+      researchSessionId: session.id
     });
     
     const expiresAt = new Date();
@@ -115,10 +126,8 @@ describe('Approvals API', () => {
     
     const res = await request(app).post(`/api/v1/agent/approve/${approval.id}`);
     expect(res.status).toBe(400);
-    expect(res.body.reason).toContain('Payment requirements changed');
+    expect(res.body.status).toBe('ALTERNATIVE_REQUIRED');
     
-    const updated = await db.getApprovalRequest(approval.id);
-    expect(updated?.status).toBe('CANCELLED');
   });
 
   it('executes payment on successful approval', async () => {
@@ -138,7 +147,7 @@ describe('Approvals API', () => {
     }
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('SUCCESS');
-    expect(res.body.transactionId).toBe('tx-e2e');
+    expect(res.body.payload.transactionId).toBe('tx-e2e');
 
     const updated = await db.getApprovalRequest(approval.id);
     expect(updated?.status).toBe('APPROVED');

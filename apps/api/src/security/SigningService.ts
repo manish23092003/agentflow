@@ -11,6 +11,7 @@ export class SigningService {
     }
     
     const network = process.env.ALGORAND_NETWORK === 'mainnet' ? 'mainnet' : 'testnet';
+    console.log('SigningService constructor loaded mnemonic starting with:', mnemonic.substring(0, 10));
     const payingClient = createAvmPayingClient(mnemonic, network);
     
     // We store the bound fetchWithPayment function.
@@ -33,6 +34,9 @@ export class SigningService {
     }
 
     // The fetchWithPayment wrapper will intercept the 402, parse it, sign the tx, and retry.
-    return this.fetchWithPayment(url, options);
+    console.log('SigningService executing fetchWithPayment for URL:', url);
+    const res = await this.fetchWithPayment(url, options);
+    console.log('SigningService fetchWithPayment returned:', res.status);
+    return res;
   }
 }

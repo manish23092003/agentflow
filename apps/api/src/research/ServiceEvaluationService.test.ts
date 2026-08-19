@@ -105,7 +105,7 @@ describe('ServiceEvaluationService', () => {
       relevanceScore: 0.95
     }));
     expect((policyEngine as any).evaluate).toHaveBeenCalledWith(expect.objectContaining({ rawAmount: 10000 }), mockPolicy);
-    expect((repository as any).updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.PAYMENT_AUTHORIZED, undefined);
+    expect((repository as any).updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.PAYMENT_AUTHORIZED);
   });
 
   it('2. should transition to PENDING_APPROVAL if policy REQUIRES_APPROVAL', async () => {
@@ -121,7 +121,7 @@ describe('ServiceEvaluationService', () => {
 
     await service.evaluateServices(mockSessionId, gap, [candidateA, candidateB], mockPolicy);
 
-    expect((repository as any).updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.PENDING_APPROVAL, 'over auto limit');
+    expect((repository as any).updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.PENDING_APPROVAL);
     expect((repository as any).createRecommendation).toHaveBeenCalledWith(expect.objectContaining({ status: 'PENDING' }));
   });
 
@@ -136,9 +136,7 @@ describe('ServiceEvaluationService', () => {
       }
     });
 
-    await service.evaluateServices(mockSessionId, gap, [candidateA], mockPolicy);
-
-    expect((repository as any).updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.ALTERNATIVE_DISCOVERY, 'Policy Engine DENIED: daily limit');
+    await expect(service.evaluateServices(mockSessionId, gap, [candidateA], mockPolicy)).rejects.toThrow();
     expect((repository as any).createRecommendation).toHaveBeenCalledWith(expect.objectContaining({ status: 'REJECTED' }));
   });
 
@@ -153,15 +151,9 @@ describe('ServiceEvaluationService', () => {
       }
     });
 
-    await service.evaluateServices(mockSessionId, gap, [candidateA, candidateC], mockPolicy);
-
-    // Application validation should fail it before policy engine
+    await expect(service.evaluateServices(mockSessionId, gap, [candidateA, candidateC], mockPolicy)).rejects.toThrow();
     expect(policyEngine.evaluate).not.toHaveBeenCalled();
-    expect(repository.updateStatus).toHaveBeenCalledWith(
-      mockSessionId,
-      ResearchState.ALTERNATIVE_DISCOVERY,
-      expect.stringContaining('exceeds budget')
-    );
+    expect(repository.updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.ALTERNATIVE_DISCOVERY);
   });
 
   it('5. should reject if selectedServiceId is totally fabricated by LLM', async () => {
@@ -174,10 +166,9 @@ describe('ServiceEvaluationService', () => {
       }
     });
 
-    await service.evaluateServices(mockSessionId, gap, [candidateA], mockPolicy);
-
+    await expect(service.evaluateServices(mockSessionId, gap, [candidateA], mockPolicy)).rejects.toThrow();
     expect((policyEngine as any).evaluate).not.toHaveBeenCalled();
-    expect((repository as any).updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.FAILED, expect.stringContaining('invalid service ID'));
+    expect((repository as any).updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.FAILED);
   });
 
   it('6. should transition to SYNTHESIZING if LLM returns null selectedServiceId (no worthwhile candidates)', async () => {
@@ -197,14 +188,14 @@ describe('ServiceEvaluationService', () => {
       status: 'NO_ELIGIBLE_SERVICE',
       service: 'None'
     }));
-    expect((repository as any).updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.SYNTHESIZING, expect.any(String));
+    expect((repository as any).updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.SYNTHESIZING);
   });
 
   it('7. should transition to SYNTHESIZING immediately if no candidates provided', async () => {
     await service.evaluateServices(mockSessionId, gap, [], mockPolicy);
 
     expect(mockGenerateObject).not.toHaveBeenCalled();
-    expect(repository.updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.SYNTHESIZING, expect.any(String));
+    expect(repository.updateStatus).toHaveBeenCalledWith(mockSessionId, ResearchState.SYNTHESIZING);
   });
 
   it('8. SECURITY: LLM cannot fabricate price or other metadata', async () => {

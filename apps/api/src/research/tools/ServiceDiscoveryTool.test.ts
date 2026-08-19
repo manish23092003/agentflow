@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createServiceDiscoveryTool } from './ServiceDiscoveryTool.js';
 import { ResearchSession } from '@prisma/client';
@@ -38,9 +37,8 @@ describe('ServiceDiscoveryTool', () => {
       spent: 200000,
       status: ResearchState.PAID_DISCOVERY,
       createdAt: new Date(),
-      updatedAt: new Date(),
-      failureReason: null
-    };
+      updatedAt: new Date()
+    } as ResearchSession;
     provider = new DummyDiscoveryProvider();
   });
 

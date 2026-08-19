@@ -23,17 +23,17 @@ describe('Research API', () => {
   describe('POST /api/v1/research/start', () => {
     it('should create a session and return 201', async () => {
       vi.mocked(ResearchAgent.prototype.runFreeResearchPhase).mockResolvedValue();
-      vi.mocked(ResearchRepository.prototype.createSession).mockResolvedValue({
+      const mockSession = {
         id: '123',
         userId: 'default-user',
         goal: 'test goal',
         researchBudget: 200000,
         spent: 0,
-        status: 'CREATED',
         createdAt: new Date(),
-        updatedAt: new Date(),
-        failureReason: null
-      });
+        updatedAt: new Date()
+      };
+      
+      vi.mocked(ResearchRepository.prototype.createSession).mockResolvedValue(mockSession as any);
 
       const response = await request(app)
         .post('/api/v1/research/start')

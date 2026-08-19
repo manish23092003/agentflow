@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { z } from 'zod';
-import { tool } from 'ai';
+import { createCompatibleTool } from '../../agent/ai-sdk-adapter.js';
 import type { WebSearchProvider } from '../types.js';
 import type { ResearchRepository } from '../../db/ResearchRepository.js';
 import { ResearchStateMachine, ResearchState } from '../../agent/ResearchStateMachine.js';
@@ -12,7 +11,7 @@ export class WebSearchTool {
   ) {}
 
   public getDefinition(researchSessionId: string) {
-    return tool({
+    return createCompatibleTool({
       description: 'Search the web for free information and news. Prioritize this tool before recommending paid services.',
       parameters: z.object({
         query: z.string().describe('The search query to look up')

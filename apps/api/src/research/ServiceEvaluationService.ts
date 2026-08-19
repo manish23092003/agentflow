@@ -99,10 +99,9 @@ ${JSON.stringify(safeCandidates, null, 2)}
         this.repository,
         sessionId,
         ResearchState.SERVICE_EVALUATION,
-        ResearchState.FAILED,
-        error instanceof Error ? error.message : 'LLM evaluation failed'
+        ResearchState.FAILED
       );
-      return;
+      throw error;
     }
 
     // 3. Handle NO-SERVICE scenario
@@ -127,8 +126,7 @@ ${JSON.stringify(safeCandidates, null, 2)}
         this.repository,
         sessionId,
         ResearchState.SERVICE_EVALUATION,
-        ResearchState.SYNTHESIZING,
-        'LLM rejected all candidate services.'
+        ResearchState.SYNTHESIZING
       );
       return;
     }
@@ -142,10 +140,9 @@ ${JSON.stringify(safeCandidates, null, 2)}
         this.repository,
         sessionId,
         ResearchState.SERVICE_EVALUATION,
-        ResearchState.FAILED,
-        `LLM selected invalid service ID: ${evaluationResult.selectedServiceId}`
+        ResearchState.FAILED
       );
-      return;
+      throw new Error(`LLM selected invalid service ID: ${evaluationResult.selectedServiceId}`);
     }
 
     // Validate remaining budget
@@ -154,10 +151,9 @@ ${JSON.stringify(safeCandidates, null, 2)}
         this.repository,
         sessionId,
         ResearchState.SERVICE_EVALUATION,
-        ResearchState.ALTERNATIVE_DISCOVERY,
-        `Selected service exceeds budget. Candidate cost: ${selectedCandidate.rawAmount}, Remaining: ${remainingBudgetBaseUnits}`
+        ResearchState.ALTERNATIVE_DISCOVERY
       );
-      return;
+      throw new Error(`Selected service exceeds budget. Candidate cost: ${selectedCandidate.rawAmount}, Remaining: ${remainingBudgetBaseUnits}`);
     }
 
     // Validate URL
@@ -166,10 +162,9 @@ ${JSON.stringify(safeCandidates, null, 2)}
         this.repository,
         sessionId,
         ResearchState.SERVICE_EVALUATION,
-        ResearchState.FAILED,
-        `Selected service is missing resource URL.`
+        ResearchState.FAILED
       );
-      return;
+      throw new Error(`Selected service is missing resource URL.`);
     }
 
     // Validate Asset & Network (Basic presence check, PolicyEngine does the thorough check against policy)
@@ -178,10 +173,9 @@ ${JSON.stringify(safeCandidates, null, 2)}
         this.repository,
         sessionId,
         ResearchState.SERVICE_EVALUATION,
-        ResearchState.FAILED,
-        `Selected service is missing required payment metadata.`
+        ResearchState.FAILED
       );
-      return;
+      throw new Error(`Selected service is missing required payment metadata.`);
     }
 
     // 5. Call PolicyEngine with EXACT candidate metadata
@@ -237,9 +231,9 @@ ${JSON.stringify(safeCandidates, null, 2)}
         this.repository,
         sessionId,
         ResearchState.SERVICE_EVALUATION,
-        ResearchState.ALTERNATIVE_DISCOVERY,
-        `Policy Engine DENIED: ${policyDecision.reason}`
+        ResearchState.ALTERNATIVE_DISCOVERY
       );
+      throw new Error(`Policy Engine DENIED: ${policyDecision.reason}`);
     }
   }
 }

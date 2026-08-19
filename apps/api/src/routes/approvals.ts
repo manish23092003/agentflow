@@ -1,15 +1,22 @@
 import { Router, Request, Response } from 'express';
-import { readPaymentRequired } from '@agentflow/x402-client';
 import { prisma } from '../db/prisma.js';
 import { PrismaPaymentRepository } from '../db/PaymentHistory.js';
 import { PolicyEngine } from '../agent/PolicyEngine.js';
 import { SigningService } from '../security/SigningService.js';
 import type { UserSpendingPolicy } from '../agent/types.js';
+import { ProcurementService } from '../research/ProcurementService.js';
+import { ResearchRepository } from '../db/ResearchRepository.js';
+import { PaymentTool } from '../agent/PaymentTool.js';
+import { ResearchState } from '../agent/ResearchStateMachine.js';
 
 const router = Router();
 const db = new PrismaPaymentRepository();
 const policyEngine = new PolicyEngine(db);
 const signingService = new SigningService();
+
+const researchRepo = new ResearchRepository();
+const paymentTool = new PaymentTool(db, policyEngine, signingService);
+const procurementService = new ProcurementService(researchRepo, db, paymentTool);
 
 // Mock policy for phase 5 since we don't have user management yet
 const mockPolicy: UserSpendingPolicy = {
@@ -69,6 +76,14 @@ router.post('/reject/:approvalId', async (req: Request, res: Response) => {
 
     await db.updateStatus(approval.paymentRecordId, { status: 'FAILED' }); // or leave PENDING_APPROVAL? The user says leave unpaid. "FAILED" is appropriate since it won't be paid.
 
+    // Update research session
+    if (approval.paymentRecordId) {
+      const paymentRecord = await db.getPaymentById(approval.paymentRecordId);
+      if (paymentRecord?.researchSessionId) {
+        await researchRepo.updateStatus(paymentRecord.researchSessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      }
+    }
+
     res.json({
       status: 'REJECTED',
       approvalId,
@@ -103,38 +118,6 @@ router.post('/approve/:approvalId', async (req: Request, res: Response) => {
       return res.status(400).json({ status: 'FAILED', reason: 'Associated payment record is not in PENDING_APPROVAL state' });
     }
 
-    // Re-fetch 402 requirements
-    const fetchRes = await fetch(approval.resourceUrl);
-    if (fetchRes.status !== 402) {
-      await db.updateApprovalRequest(approvalId, { status: 'CANCELLED', resolutionReason: 'Resource no longer requires payment' });
-      return res.status(400).json({ status: 'FAILED', reason: 'Resource no longer requires payment' });
-    }
-
-    const requirement = readPaymentRequired(fetchRes);
-    if (!requirement) {
-      await db.updateApprovalRequest(approvalId, { status: 'CANCELLED', resolutionReason: 'Could not parse payment requirement' });
-      return res.status(400).json({ status: 'FAILED', reason: 'Could not parse new payment requirements' });
-    }
-
-    // Verify conditions are unchanged
-    if (
-      requirement.rawAmount !== approval.amount ||
-      requirement.asset !== approval.asset ||
-      requirement.network !== approval.network
-    ) {
-      await db.updateApprovalRequest(approvalId, { status: 'CANCELLED', resolutionReason: 'Payment requirements changed' });
-      return res.status(400).json({ status: 'FAILED', reason: 'Payment requirements changed since approval request was created' });
-    }
-
-    // Re-evaluate policy to ensure they haven't spent their daily limit elsewhere
-    const decision = await policyEngine.evaluate(requirement, mockPolicy);
-    // Note: since the policy says requireApprovalAbove=5000, it WILL return REQUIRES_APPROVAL.
-    // That is fine, because the user explicitly APPROVED it this time.
-    if (decision.decision === 'DENIED') {
-      await db.updateApprovalRequest(approvalId, { status: 'REJECTED', resolutionReason: 'Policy Engine Denied at execution time' });
-      return res.status(400).json({ status: 'FAILED', reason: 'Policy Engine Denied at execution time' });
-    }
-
     // Atomic update
     const updated = await prisma.approvalRequest.updateMany({
       where: { id: approvalId, status: 'PENDING' },
@@ -149,24 +132,19 @@ router.post('/approve/:approvalId', async (req: Request, res: Response) => {
       return res.status(409).json({ status: 'FAILED', reason: 'Race condition: Approval request no longer pending' });
     }
 
-    // Call Signing Service
-    // We override decision to APPROVED so SigningService permits it
-    const paidResponse = await signingService.executeAuthorizedPayment(approval.resourceUrl, {}, { decision: 'APPROVED', reason: 'User explicitly approved' });
-    
-    if (!paidResponse.ok) {
-      await db.updateStatus(paymentRecord.id, { status: 'FAILED' });
-      return res.status(500).json({ status: 'PAYMENT_FAILED', reason: `Execution failed with HTTP ${paidResponse.status}` });
+    await prisma.paymentRecord.update({
+      where: { id: approval.paymentRecordId },
+      data: { decision: 'APPROVED' }
+    });
+
+    // Resume flow via ProcurementService
+    const result = await procurementService.resumeApproval(approvalId, mockPolicy);
+
+    if (result.status !== 'SUCCESS') {
+      return res.status(400).json(result);
     }
 
-    const paymentIdentifier = paidResponse.headers.get('payment-identifier') || paidResponse.headers.get('x-payment-identifier');
-    
-    await db.updateStatus(paymentRecord.id, { status: 'SUCCESS', transactionId: paymentIdentifier || undefined });
-
-    res.json({
-      status: 'SUCCESS',
-      transactionId: paymentIdentifier || 'unknown',
-      amount: approval.amount.toString()
-    });
+    res.json(result);
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

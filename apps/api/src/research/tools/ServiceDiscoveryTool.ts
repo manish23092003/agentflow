@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { tool } from 'ai';
+import { createCompatibleTool } from '../../agent/ai-sdk-adapter.js';
 import { z } from 'zod';
 import { ResearchSession } from '@prisma/client';
 import { ResearchState } from '../../agent/ResearchStateMachine.js';
@@ -10,7 +9,7 @@ export function createServiceDiscoveryTool(
   session: ResearchSession,
   provider: ServiceDiscoveryProvider
 ) {
-  return tool({
+  return createCompatibleTool({
     description: `Discover premium, paid x402-compatible services from the Bazaar directory. Use this when the free information is insufficient and you need to procure paid data. 
 Returns a list of candidate services with their prices, networks, and URLs.
 Do NOT fabricate payment credentials or guess facilitator URLs.

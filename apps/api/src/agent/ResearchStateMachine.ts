@@ -64,14 +64,14 @@ export class ResearchStateMachine {
    * Validates and executes a state transition, updating the database.
    */
   public static async transition(
-    repository: { updateStatus: (id: string, status: ResearchState, failureReason?: string) => Promise<any> },
+    repository: { updateStatus: (id: string, status: ResearchState) => Promise<unknown> },
     sessionId: string,
     currentState: ResearchState,
     nextState: ResearchState,
-    failureReason?: string
+    _failureReason?: string // Ignored, kept for compatibility
   ): Promise<void> {
     this.validateTransition(currentState, nextState);
-    await repository.updateStatus(sessionId, nextState, failureReason);
+    await repository.updateStatus(sessionId, nextState);
   }
 
   /**

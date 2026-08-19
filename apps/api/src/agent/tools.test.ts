@@ -1,4 +1,4 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi } from 'vitest';
 import { createPaymentLLMTool } from './tools.js';
 import type { PaymentTool } from './PaymentTool.js';
@@ -31,9 +31,9 @@ describe('Payment LLM Tool', () => {
     const tool = createPaymentLLMTool(mockPaymentExecutor, dummyPolicy);
     
     // Test the execute function directly
-    const result = await tool.execute({ url: 'http://test', context: 'test' }, {}) as { status: string; data: string; amount: string; transactionId: string };
+    const result = await tool.execute({ url: 'http://test', context: 'test' }, { toolCallId: '1', messages: [] } as any) as { status: string; data: string; amount: string; transactionId: string };
     
-    expect(result.status).toBe('SUCCESS');
+    expect((result as any).status).toBe('SUCCESS');
     expect(result.data).toBe('secret data');
     expect(result.amount).toBe('100');
     expect(result.transactionId).toBe('tx-123');
@@ -45,9 +45,9 @@ describe('Payment LLM Tool', () => {
     } as unknown as PaymentTool;
 
     const tool = createPaymentLLMTool(mockPaymentExecutor, dummyPolicy);
-    const result = await tool.execute({ url: 'http://test', context: 'test' }, {});
+    const result = await tool.execute({ url: 'http://test', context: 'test' }, { toolCallId: '1', messages: [] } as any);
     
-    expect(result.status).toBe('DENIED');
+    expect((result as any).status).toBe('DENIED');
   });
 
   it('returns PAYMENT_FAILED when payment execution fails', async () => {
@@ -56,9 +56,9 @@ describe('Payment LLM Tool', () => {
     } as unknown as PaymentTool;
 
     const tool = createPaymentLLMTool(mockPaymentExecutor, dummyPolicy);
-    const result = await tool.execute({ url: 'http://test', context: 'test' }, {});
+    const result = await tool.execute({ url: 'http://test', context: 'test' }, { toolCallId: '1', messages: [] } as any);
     
-    expect(result.status).toBe('PAYMENT_FAILED');
+    expect((result as any).status).toBe('PAYMENT_FAILED');
   });
 
   it('returns RESOURCE_FAILED for generic fetch errors', async () => {
@@ -67,8 +67,8 @@ describe('Payment LLM Tool', () => {
     } as unknown as PaymentTool;
 
     const tool = createPaymentLLMTool(mockPaymentExecutor, dummyPolicy);
-    const result = await tool.execute({ url: 'http://test', context: 'test' }, {});
+    const result = await tool.execute({ url: 'http://test', context: 'test' }, { toolCallId: '1', messages: [] } as any);
     
-    expect(result.status).toBe('RESOURCE_FAILED');
+    expect((result as any).status).toBe('RESOURCE_FAILED');
   });
 });

@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { tool } from 'ai';
+import { createCompatibleTool } from './ai-sdk-adapter.js';
 import { z } from 'zod';
 import type { PaymentTool } from './PaymentTool.js';
 import { ApprovalRequiredError } from './PaymentTool.js';
@@ -10,7 +9,7 @@ import type { UserSpendingPolicy } from './types.js';
  * We do not execute the payment fully in Step 3, but we set up the schema.
  */
 export function createPaymentLLMTool(paymentExecutor: PaymentTool, policy: UserSpendingPolicy) {
-  return tool({
+  return createCompatibleTool({
     description: 'Fetches a protected web resource. If the resource requires payment (HTTP 402), it will automatically evaluate your spending policy and execute the payment if approved.',
     parameters: z.object({
       url: z.string().url().describe('The URL of the protected resource to fetch'),

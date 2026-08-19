@@ -48,7 +48,7 @@ describe('ResearchAgent', () => {
     vi.mocked(generateText).mockRejectedValue({ statusCode: 429 });
 
     await expect(agent.runFreeResearchPhase('1')).rejects.toThrowError(LLMExecutionError);
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, 'LLM_QUOTA_EXCEEDED');
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
   });
 
   it('should transition to FAILED on generic provider error', async () => {
@@ -58,7 +58,7 @@ describe('ResearchAgent', () => {
     vi.mocked(generateText).mockRejectedValue(new Error('Some API error'));
 
     await expect(agent.runFreeResearchPhase('1')).rejects.toThrowError(LLMExecutionError);
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, 'LLM_API_ERROR');
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
   });
 
   it('should transition to FAILED on empty LLM response with zero tool calls', async () => {
@@ -69,7 +69,7 @@ describe('ResearchAgent', () => {
     vi.mocked(generateText).mockResolvedValue({ text: '', toolCalls: [] } as any);
 
     await expect(agent.runFreeResearchPhase('1')).rejects.toThrowError(LLMExecutionError);
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, 'LLM_NO_TOOL_CALL');
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
   });
 
   it('should transition to FAILED if zero citations are persisted', async () => {
@@ -85,7 +85,7 @@ describe('ResearchAgent', () => {
     } as any);
 
     await expect(agent.runFreeResearchPhase('1')).rejects.toThrowError(LLMExecutionError);
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, 'NO_CITATIONS_PERSISTED');
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
   });
 
   it('should complete successfully if citations exist', async () => {

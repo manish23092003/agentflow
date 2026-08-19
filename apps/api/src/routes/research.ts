@@ -3,12 +3,31 @@ import { z } from 'zod';
 import { ResearchRepository } from '../db/ResearchRepository.js';
 import { ResearchAgent } from '../agent/ResearchAgent.js';
 import { TavilySearchProvider } from '../research/providers/TavilySearchProvider.js';
-
+import { ProcurementService } from '../research/ProcurementService.js';
+import { PrismaPaymentRepository } from '../db/PaymentHistory.js';
+import { PaymentTool } from '../agent/PaymentTool.js';
+import { PolicyEngine } from '../agent/PolicyEngine.js';
+import { SigningService } from '../security/SigningService.js';
+import type { UserSpendingPolicy } from '../agent/types.js';
 const researchRouter = Router();
 
 const repository = new ResearchRepository();
 const webSearchProvider = new TavilySearchProvider();
 const researchAgent = new ResearchAgent(repository, webSearchProvider);
+
+const paymentRepo = new PrismaPaymentRepository();
+const policyEngine = new PolicyEngine(paymentRepo);
+const signingService = new SigningService();
+const paymentTool = new PaymentTool(paymentRepo, policyEngine, signingService);
+const procurementService = new ProcurementService(repository, paymentRepo, paymentTool);
+
+const mockPolicy: UserSpendingPolicy = {
+  maxPerTransaction: 100000000, 
+  dailyLimit: 1000000000,
+  allowedAssets: [10458941],
+  allowedNetworks: ['testnet', 'algorand-testnet', 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI='],
+  requireApprovalAbove: 5000
+};
 
 const StartResearchSchema = z.object({
   goal: z.string(),
@@ -62,6 +81,31 @@ researchRouter.get('/:id', async (req, res) => {
     });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+const ProcureSchema = z.object({
+  recommendationId: z.string()
+});
+
+researchRouter.post('/:id/procure', async (req, res) => {
+  try {
+    const { recommendationId } = ProcureSchema.parse(req.body);
+    const result = await procurementService.executeProcurement(
+      req.params.id,
+      recommendationId,
+      mockPolicy
+    );
+
+    res.json(result);
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      res.status(400).json({ error: (error as any).errors });
+    } else {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: msg });
+    }
   }
 });
 

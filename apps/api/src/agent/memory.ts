@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-type CoreMessage = any;
+import type { ModelMessage } from 'ai';
 
 export interface SessionData {
   id: string;
-  messages: CoreMessage[];
+  messages: ModelMessage[];
   createdAt: number;
 }
 
@@ -20,7 +20,7 @@ export class MemoryStore {
     return id;
   }
 
-  appendMessage(sessionId: string, message: CoreMessage) {
+  appendMessage(sessionId: string, message: ModelMessage) {
     const session = this.sessions.get(sessionId);
     if (!session) {
       throw new Error(`Session ${sessionId} not found`);
@@ -28,7 +28,7 @@ export class MemoryStore {
     session.messages.push(message);
   }
 
-  getHistory(sessionId: string): CoreMessage[] {
+  getHistory(sessionId: string): ModelMessage[] {
     const session = this.sessions.get(sessionId);
     if (!session) {
       throw new Error(`Session ${sessionId} not found`);

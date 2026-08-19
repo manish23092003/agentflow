@@ -1,4 +1,4 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WebSearchTool } from './tools/WebSearchTool.js';
 import { MockSearchProvider } from './providers/MockSearchProvider.js';
@@ -43,9 +43,9 @@ describe('WebSearchTool', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await def.execute!({ query: 'test query' }, {} as any);
 
-    expect(result.error).toBeUndefined();
-    expect(result.results!).toHaveLength(2);
-    expect(result.results![0].title).toBe('Mock Result for: test query');
+    expect((result as any).error).toBeUndefined();
+    expect((result as any).results!).toHaveLength(2);
+    expect((result as any).results![0].title).toBe('Mock Result for: test query');
 
     expect(mockRepo.addCitation).toHaveBeenCalledTimes(2);
     expect(mockRepo.addCitation).toHaveBeenCalledWith(expect.objectContaining({

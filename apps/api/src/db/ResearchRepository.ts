@@ -23,10 +23,10 @@ export class ResearchRepository {
     });
   }
 
-  async updateStatus(id: string, status: ResearchState, failureReason?: string): Promise<ResearchSession> {
+  async updateStatus(id: string, status: ResearchState): Promise<ResearchSession> {
     return this.db.researchSession.update({
       where: { id },
-      data: { status, failureReason }
+      data: { status }
     });
   }
 

@@ -44,7 +44,7 @@ describe('GapAnalysisService', () => {
     await service.evaluateGaps('1');
 
     expect(repository.createGap).toHaveBeenCalledWith(expect.objectContaining({ hasMaterialGap: false }));
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.SYNTHESIZING, undefined);
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.SYNTHESIZING);
   });
 
   it('should transition to PAID_DISCOVERY when a HIGH material gap exists', async () => {
@@ -65,7 +65,7 @@ describe('GapAnalysisService', () => {
     await service.evaluateGaps('1');
 
     expect(repository.createGap).toHaveBeenCalledWith(expect.objectContaining({ hasMaterialGap: true, importance: 'HIGH' }));
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.PAID_DISCOVERY, undefined);
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.PAID_DISCOVERY);
   });
 
   it('should transition to PAID_DISCOVERY when a MEDIUM material gap exists', async () => {
@@ -85,7 +85,7 @@ describe('GapAnalysisService', () => {
 
     await service.evaluateGaps('1');
 
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.PAID_DISCOVERY, undefined);
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.PAID_DISCOVERY);
   });
 
   it('should transition to SYNTHESIZING when a LOW material gap exists', async () => {
@@ -105,16 +105,16 @@ describe('GapAnalysisService', () => {
 
     await service.evaluateGaps('1');
 
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.SYNTHESIZING, undefined);
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.SYNTHESIZING);
   });
 
   it('should safely fail if zero citations are available', async () => {
     repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.EVALUATING_GAPS, goal: 'test' });
     repository.getCitationsBySessionId.mockResolvedValue([]);
 
-    await service.evaluateGaps('1');
+    await expect(service.evaluateGaps('1')).rejects.toThrow();
 
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, 'NO_EVIDENCE_FOR_GAP_ANALYSIS');
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
     expect(generateObject).not.toHaveBeenCalled();
   });
 
@@ -133,9 +133,9 @@ describe('GapAnalysisService', () => {
       }
     } as any);
 
-    await service.evaluateGaps('1');
+    await expect(service.evaluateGaps('1')).rejects.toThrow();
 
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, 'LLM returned invalid citation IDs: invalid-id');
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
   });
 
   it('should transition to FAILED on Gemini API error', async () => {
@@ -144,9 +144,9 @@ describe('GapAnalysisService', () => {
     
     vi.mocked(generateObject).mockRejectedValue(new Error('API Rate Limit'));
 
-    await service.evaluateGaps('1');
+    await expect(service.evaluateGaps('1')).rejects.toThrow();
 
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, 'API Rate Limit');
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
   });
 
   it('should throw Error if session does not exist', async () => {

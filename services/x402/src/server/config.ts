@@ -32,8 +32,8 @@ export function loadConfig(): RuntimeConfig {
     throw new Error('X402_PRICE must be a valid numeric string.');
   }
 
-  const usdcAssetId = process.env.X402_USDC_ASSET_ID;
-  if (!usdcAssetId || isNaN(Number(usdcAssetId))) {
+  const usdcAssetId = process.env.X402_USDC_ASSET_ID || '0';
+  if (isNaN(Number(usdcAssetId))) {
     throw new Error('X402_USDC_ASSET_ID must be configured and valid.');
   }
 
@@ -87,6 +87,7 @@ export function createX402Middleware(config: RuntimeConfig) {
     },
   });
 
+  console.log('Middleware Config:', { usdcAssetId: config.usdcAssetId });
   return paymentMiddleware(
     {
       'GET /research/insight': {

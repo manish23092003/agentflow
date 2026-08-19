@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { generateText } from 'ai';
 import { GeminiProvider } from '../llm/gemini.js';
 import type { ResearchRepository } from '../db/ResearchRepository.js';
@@ -79,8 +78,10 @@ When you are satisfied that you have exhausted free search options for this phas
       ResearchStateMachine.validateTransition(ResearchState.RESEARCHING_FREE, ResearchState.FREE_RESEARCH_COMPLETE);
       await this.repository.updateStatus(sessionId, ResearchState.FREE_RESEARCH_COMPLETE);
 
-    } catch (error: any) {
-      let code = 'LLM_API_ERROR';
+    } catch (error: unknown) {
+      console.error('[ResearchAgent] Execution failed:', error);
+
+      let code = 'LLM_ERROR';
       let message = error instanceof Error ? error.message : String(error);
       let retryable = false;
 
@@ -88,14 +89,17 @@ When you are satisfied that you have exhausted free search options for this phas
         code = error.code;
         message = error.message;
         retryable = error.retryable;
-      } else if (error.statusCode === 429 || message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
-        code = 'LLM_QUOTA_EXCEEDED';
-        retryable = true;
-      } else if (error.name === 'APICallError') {
-        code = 'LLM_API_ERROR';
+      } else if (error && typeof error === 'object') {
+        const err = error as Record<string, unknown>;
+        if (err.statusCode === 429 || message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
+          code = 'LLM_QUOTA_EXCEEDED';
+          retryable = true;
+        } else if (err.name === 'APICallError') {
+          code = 'LLM_API_ERROR';
+        }
       }
 
-      await this.repository.updateStatus(sessionId, ResearchState.FAILED, code);
+      await this.repository.updateStatus(sessionId, ResearchState.FAILED);
       throw new LLMExecutionError(code, message, retryable);
     }
   }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ServiceDiscoveryProvider, DiscoveredService, ServiceDiscoveryOptions } from './types.js';
 
 export class MockServiceDiscoveryProvider implements ServiceDiscoveryProvider {
@@ -11,7 +10,7 @@ export class MockServiceDiscoveryProvider implements ServiceDiscoveryProvider {
         name: 'Bazaar Mock Data Service',
         url: 'http://localhost:3002/api/v1/bazaar/dataset',
         description: 'Mock data set for testing.',
-        price: 0.1,
+        rawAmount: 100000, decimals: 6,
         asset: '10458941',
         network: 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=',
         paymentScheme: 'exact',
@@ -22,7 +21,7 @@ export class MockServiceDiscoveryProvider implements ServiceDiscoveryProvider {
         name: 'Premium AI Insights',
         url: 'https://api.example.com/premium-ai',
         description: 'Premium AI research data with quantitative insights.',
-        price: 0.5,
+        rawAmount: 500000, decimals: 6,
         asset: '10458941',
         network: 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=',
         paymentScheme: 'exact',
@@ -31,7 +30,7 @@ export class MockServiceDiscoveryProvider implements ServiceDiscoveryProvider {
     ];
 
     return candidates.filter(c => {
-      if (options?.maxPrice !== undefined && c.price > options.maxPriceBaseUnits) return false;
+      if (options?.maxPriceBaseUnits !== undefined && c.rawAmount > options.maxPriceBaseUnits) return false;
       if (options?.allowedNetworks && !options.allowedNetworks.includes(c.network)) return false;
       if (options?.allowedAssets && !options.allowedAssets.includes(c.asset)) return false;
       return true;
