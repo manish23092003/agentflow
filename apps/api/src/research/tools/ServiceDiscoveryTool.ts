@@ -4,6 +4,7 @@ import { ResearchSession } from '@prisma/client';
 import { ResearchState } from '../../agent/ResearchStateMachine.js';
 import { ServiceDiscoveryProvider } from '../types.js';
 import { config } from '../../config.js';
+import { researchEvents } from '../ResearchEventService.js';
 
 export function createServiceDiscoveryTool(
   session: ResearchSession,
@@ -61,6 +62,15 @@ Input a specific topic to search for.`,
             candidates: []
           };
         }
+
+        candidates.forEach(c => {
+          researchEvents.emitServiceDiscovered(session.id, {
+            id: c.id,
+            name: c.name,
+            cost: c.priceUsdc ?? 0,
+            provider: 'Bazaar'
+          });
+        });
 
         // Return a sanitized list to the LLM
         return {

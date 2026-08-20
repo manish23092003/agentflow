@@ -23,6 +23,12 @@ export class ResearchRepository {
     });
   }
 
+  async getSessions(): Promise<ResearchSession[]> {
+    return this.db.researchSession.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
   async updateStatus(id: string, status: ResearchState): Promise<ResearchSession> {
     return this.db.researchSession.update({
       where: { id },

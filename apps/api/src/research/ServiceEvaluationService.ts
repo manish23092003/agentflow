@@ -7,6 +7,7 @@ import { ResearchStateMachine, ResearchState } from '../agent/ResearchStateMachi
 import type { DiscoveredService } from './types.js';
 import type { PolicyEngine } from '../agent/PolicyEngine.js';
 import type { UserSpendingPolicy } from '../agent/types.js';
+import { researchEvents } from './ResearchEventService.js';
 
 export const ServiceEvaluationSchema = z.object({
   selectedServiceId: z.string().nullable().describe("The ID of the best service to procure, or null if none are eligible/worthwhile."),
@@ -128,8 +129,12 @@ ${JSON.stringify(safeCandidates, null, 2)}
         ResearchState.SERVICE_EVALUATION,
         ResearchState.SYNTHESIZING
       );
+      
+      researchEvents.emitServiceEvaluated(sessionId, '', false, evaluationResult.reason);
       return;
     }
+
+    researchEvents.emitServiceEvaluated(sessionId, evaluationResult.selectedServiceId, true, evaluationResult.reason);
 
     // 4. Resolve Candidate & Validate Deterministically
     const selectedCandidate = candidates.find(c => c.id === evaluationResult.selectedServiceId);

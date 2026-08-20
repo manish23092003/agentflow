@@ -5,6 +5,7 @@ import { PaymentTool, ApprovalRequiredError } from '../agent/PaymentTool.js';
 import { ResearchState } from '../agent/ResearchStateMachine.js';
 import type { UserSpendingPolicy } from '../agent/types.js';
 import crypto from 'node:crypto';
+import { researchEvents } from './ResearchEventService.js';
 
 export class ProcurementService {
   constructor(
@@ -38,6 +39,7 @@ export class ProcurementService {
     const remainingBudget = session.researchBudget - session.spent;
     if (recommendation.price > remainingBudget) {
       await this.researchRepo.updateStatus(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      researchEvents.emitSessionState(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       return { status: 'DENIED' };
     }
 
@@ -45,12 +47,14 @@ export class ProcurementService {
     const fetchRes = await fetch(recommendation.serviceUrl);
     if (fetchRes.status !== 402) {
       await this.researchRepo.updateStatus(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      researchEvents.emitSessionState(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       return { status: 'ALTERNATIVE_REQUIRED' };
     }
 
     const requirement = readPaymentRequired(fetchRes);
     if (!requirement) {
       await this.researchRepo.updateStatus(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      researchEvents.emitSessionState(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       return { status: 'ALTERNATIVE_REQUIRED' };
     }
 
@@ -62,12 +66,14 @@ export class ProcurementService {
     ) {
       console.error('Validation failed: requirement vs recommendation mismatch', { requirement, recommendation });
       await this.researchRepo.updateStatus(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      researchEvents.emitSessionState(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       return { status: 'ALTERNATIVE_REQUIRED' };
     }
 
     // Ensure rawAmount is within budget again just to be strictly safe
     if (requirement.rawAmount > remainingBudget) {
       await this.researchRepo.updateStatus(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      researchEvents.emitSessionState(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       return { status: 'DENIED' };
     }
 
@@ -80,7 +86,9 @@ export class ProcurementService {
         ? { ...policy, requireApprovalAbove: Math.max(policy.requireApprovalAbove, requirement.rawAmount + 1) }
         : policy;
 
+      researchEvents.emitPaymentStarted(sessionId, '', requirement.rawAmount, requirement.asset);
       const result = await this.paymentTool.fetchResource(recommendation.serviceUrl, executionPolicy, 'Procurement for Research');
+      researchEvents.emitPaymentSettled(sessionId, result.metadata?.transactionId || '');
 
       // 4. Link PaymentRecord
       if (result.metadata?.paymentRecordId) {
@@ -107,6 +115,8 @@ export class ProcurementService {
       // Atomically update spent
       await this.researchRepo.updateSpent(sessionId, requirement.rawAmount);
       await this.researchRepo.updateStatus(sessionId, ResearchState.RESOURCE_ACQUIRED);
+      researchEvents.emitSessionState(sessionId, ResearchState.RESOURCE_ACQUIRED);
+      researchEvents.emitResourceAcquired(sessionId, recommendation.serviceUrl);
 
       return { status: 'SUCCESS', payload: { transactionId: result.metadata?.transactionId, amount: requirement.rawAmount } };
       
@@ -119,11 +129,22 @@ export class ProcurementService {
         }
         
         await this.researchRepo.updateStatus(sessionId, ResearchState.PENDING_APPROVAL);
+        researchEvents.emitSessionState(sessionId, ResearchState.PENDING_APPROVAL);
+        researchEvents.emitApprovalRequired(sessionId, e.payload.approvalId, {
+          service: recommendation.service,
+          amount: Number(e.payload.amount),
+          asset: e.payload.asset,
+          network: e.payload.network,
+          reason: e.payload.reason,
+          expectedValue: recommendation.expectedValue,
+          remainingBudget
+        });
         return { status: 'REQUIRES_APPROVAL', payload: e.payload };
       }
 
       // Payment failed
       await this.researchRepo.updateStatus(sessionId, ResearchState.FAILED);
+      researchEvents.emitSessionState(sessionId, ResearchState.FAILED);
       return { status: 'FAILED', payload: { error: e instanceof Error ? e.message : String(e) } };
     }
   }
@@ -161,12 +182,14 @@ export class ProcurementService {
     const fetchRes = await fetch(approval.resourceUrl);
     if (fetchRes.status !== 402) {
       await this.researchRepo.updateStatus(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      researchEvents.emitSessionState(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       return { status: 'ALTERNATIVE_REQUIRED' };
     }
 
     const requirement = readPaymentRequired(fetchRes);
     if (!requirement) {
       await this.researchRepo.updateStatus(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      researchEvents.emitSessionState(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       return { status: 'ALTERNATIVE_REQUIRED' };
     }
 
@@ -177,18 +200,23 @@ export class ProcurementService {
       requirement.network !== approval.network
     ) {
       await this.researchRepo.updateStatus(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      researchEvents.emitSessionState(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       return { status: 'ALTERNATIVE_REQUIRED' };
     }
 
     if (requirement.rawAmount > remainingBudget) {
       await this.researchRepo.updateStatus(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+      researchEvents.emitSessionState(sessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       return { status: 'DENIED' };
     }
 
     // 3. Execute PaymentTool with bypassed policy for the approved amount
     try {
       const executionPolicy = { ...policy, requireApprovalAbove: Math.max(policy.requireApprovalAbove, requirement.rawAmount + 1) };
+      
+      researchEvents.emitPaymentStarted(sessionId, '', requirement.rawAmount, requirement.asset);
       const result = await this.paymentTool.fetchResource(approval.resourceUrl, executionPolicy, 'Procurement for Research');
+      researchEvents.emitPaymentSettled(sessionId, result.metadata?.transactionId || '');
 
       // Update payment record transaction ID and status
       await this.paymentRepo.updatePayment(paymentRecord.id, { 
@@ -214,11 +242,14 @@ export class ProcurementService {
 
       await this.researchRepo.updateSpent(sessionId, requirement.rawAmount);
       await this.researchRepo.updateStatus(sessionId, ResearchState.RESOURCE_ACQUIRED);
+      researchEvents.emitSessionState(sessionId, ResearchState.RESOURCE_ACQUIRED);
+      researchEvents.emitResourceAcquired(sessionId, approval.resourceUrl);
 
       return { status: 'SUCCESS', payload: { transactionId: result.metadata?.transactionId, amount: requirement.rawAmount } };
       
     } catch (e: unknown) {
       await this.researchRepo.updateStatus(sessionId, ResearchState.FAILED);
+      researchEvents.emitSessionState(sessionId, ResearchState.FAILED);
       return { status: 'FAILED', payload: { error: e instanceof Error ? e.message : String(e) } };
     }
   }

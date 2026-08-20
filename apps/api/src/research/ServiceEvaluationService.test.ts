@@ -1,4 +1,3 @@
-// @ts-nocheck
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ServiceEvaluationService } from './ServiceEvaluationService.js';
@@ -14,8 +13,8 @@ vi.mock('ai', () => ({
 }));
 
 describe('ServiceEvaluationService', () => {
-  let repository: unknown;
-  let policyEngine: unknown;
+  let repository: any;
+  let policyEngine: any;
   let service: ServiceEvaluationService;
   const mockSessionId = 'session-123';
   const mockPolicy: UserSpendingPolicy = {

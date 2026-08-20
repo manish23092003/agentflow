@@ -3,6 +3,7 @@ import { createCompatibleTool } from '../../agent/ai-sdk-adapter.js';
 import type { WebSearchProvider } from '../types.js';
 import type { ResearchRepository } from '../../db/ResearchRepository.js';
 import { ResearchStateMachine, ResearchState } from '../../agent/ResearchStateMachine.js';
+import { researchEvents } from '../ResearchEventService.js';
 
 export class WebSearchTool {
   constructor(
@@ -36,7 +37,7 @@ export class WebSearchTool {
 
           // Persist citations
           for (const res of results) {
-            await this.repository.addCitation({
+            const citation = await this.repository.addCitation({
               researchSessionId,
               url: res.url,
               title: res.title,
@@ -47,6 +48,7 @@ export class WebSearchTool {
               isPaid: false,
               cost: 0
             });
+            researchEvents.emitCitationAdded(researchSessionId, { id: citation.id, url: citation.url, title: citation.title || undefined });
           }
 
           console.log('[WebSearchTool] citations persisted');

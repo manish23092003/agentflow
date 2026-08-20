@@ -4,6 +4,7 @@ import { GeminiProvider } from '../llm/gemini.js';
 import { config } from '../config.js';
 import type { ResearchRepository } from '../db/ResearchRepository.js';
 import { ResearchStateMachine, ResearchState } from '../agent/ResearchStateMachine.js';
+import { researchEvents } from './ResearchEventService.js';
 
 export const GapAnalysisSchema = z.object({
   hasMaterialGap: z.boolean().describe("True if critical info is missing from the evidence."),
@@ -82,6 +83,8 @@ A material gap means quantitative data or critical facts are missing to fully an
         recommendedAction: gap.recommendedAction,
         evidenceCitationIds: JSON.stringify(gap.evidenceCitationIds)
       });
+      
+      researchEvents.emitAgentAction(sessionId, 'GAP_ANALYSIS_COMPLETED', `Material gap: ${gap.hasMaterialGap}. Next: ${gap.recommendedAction}`);
 
       // App logic dictates state transition
       let nextState: ResearchState;

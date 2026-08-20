@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import express from 'express';
@@ -73,6 +74,50 @@ describe('Research API', () => {
       // Wait, ResearchRepository instantiates prisma by default.
       // The router creates `const repository = new ResearchRepository();`
       // So let's just make the mock return something we can control.
+    });
+  });
+
+  describe('GET /api/v1/research/:id/stream', () => {
+    it('should initialize SSE stream and send initial state', () => {
+      return new Promise<void>((resolve, reject) => {
+        vi.mocked(ResearchRepository.prototype.getSession).mockResolvedValue({
+          id: '123',
+          userId: 'default-user',
+          goal: 'test goal',
+          researchBudget: 200000,
+          spent: 50000,
+          status: 'RESEARCHING_FREE',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          failureReason: null
+        });
+
+        const req = request(app).get('/api/v1/research/123/stream');
+        req.on('error', () => {
+          // Ignore ECONNRESET / abort error on client-side cleanup
+        });
+        
+        req.buffer(false).end((err, res) => {
+          if (err && !res) return reject(err);
+        });
+
+        req.on('response', (res) => {
+          res.on('error', () => {
+            // Ignore abort error
+          });
+          expect(res.headers['content-type']).toBe('text/event-stream');
+          expect(res.headers['cache-control']).toBe('no-cache');
+          
+          let buffered = '';
+          res.on('data', (chunk: Buffer) => {
+            buffered += chunk.toString();
+            if (buffered.includes('session_state') && buffered.includes('"status":"RESEARCHING_FREE"')) {
+              req.abort(); // Close stream to end test
+              resolve();
+            }
+          });
+        });
+      });
     });
   });
 });

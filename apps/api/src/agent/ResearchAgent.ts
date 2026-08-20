@@ -6,6 +6,7 @@ import { WebSearchTool } from '../research/tools/WebSearchTool.js';
 import { ResearchStateMachine, ResearchState } from './ResearchStateMachine.js';
 import { config } from '../config.js';
 import { LLMExecutionError } from './errors.js';
+import { researchEvents } from '../research/ResearchEventService.js';
 
 export class ResearchAgent {
   private webSearchTool: WebSearchTool;
@@ -23,6 +24,7 @@ export class ResearchAgent {
 
     ResearchStateMachine.validateTransition(session.status as ResearchState, ResearchState.RESEARCHING_FREE);
     await this.repository.updateStatus(sessionId, ResearchState.RESEARCHING_FREE);
+    researchEvents.emitSessionState(sessionId, ResearchState.RESEARCHING_FREE);
 
     const systemPrompt = `You are an autonomous research agent. Your goal is: "${session.goal}"
 You are currently in the FREE RESEARCH phase.
@@ -77,6 +79,7 @@ When you are satisfied that you have exhausted free search options for this phas
       // The LLM has completed its free research phase successfully.
       ResearchStateMachine.validateTransition(ResearchState.RESEARCHING_FREE, ResearchState.FREE_RESEARCH_COMPLETE);
       await this.repository.updateStatus(sessionId, ResearchState.FREE_RESEARCH_COMPLETE);
+      researchEvents.emitSessionState(sessionId, ResearchState.FREE_RESEARCH_COMPLETE);
 
     } catch (error: unknown) {
       console.error('[ResearchAgent] Execution failed:', error);
@@ -100,6 +103,7 @@ When you are satisfied that you have exhausted free search options for this phas
       }
 
       await this.repository.updateStatus(sessionId, ResearchState.FAILED);
+      researchEvents.emitResearchFailed(sessionId, message);
       throw new LLMExecutionError(code, message, retryable);
     }
   }

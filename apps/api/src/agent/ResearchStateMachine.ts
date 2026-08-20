@@ -72,6 +72,8 @@ export class ResearchStateMachine {
   ): Promise<void> {
     this.validateTransition(currentState, nextState);
     await repository.updateStatus(sessionId, nextState);
+    const { researchEvents } = await import('../research/ResearchEventService.js');
+    researchEvents.emitSessionState(sessionId, nextState);
   }
 
   /**

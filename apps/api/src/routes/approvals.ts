@@ -8,6 +8,7 @@ import { ProcurementService } from '../research/ProcurementService.js';
 import { ResearchRepository } from '../db/ResearchRepository.js';
 import { PaymentTool } from '../agent/PaymentTool.js';
 import { ResearchState } from '../agent/ResearchStateMachine.js';
+import { researchEvents } from '../research/ResearchEventService.js';
 
 const router = Router();
 const db = new PrismaPaymentRepository();
@@ -26,6 +27,31 @@ const mockPolicy: UserSpendingPolicy = {
   allowedNetworks: ['testnet', 'algorand-testnet', 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI='],
   requireApprovalAbove: 5000 // 0.005 USDC
 };
+
+router.get('/approvals', async (req: Request, res: Response) => {
+  try {
+    const approvals = await db.getApprovalRequests();
+    
+    // Enrich with session data for the frontend
+    const enriched = await Promise.all(approvals.map(async (approval) => {
+      const payment = await db.getPaymentById(approval.paymentRecordId);
+      if (payment && payment.researchSessionId) {
+        const session = await researchRepo.getSession(payment.researchSessionId);
+        return {
+          ...approval,
+          researchSessionId: payment.researchSessionId,
+          researchGoal: session?.goal || 'Unknown Goal'
+        };
+      }
+      return approval;
+    }));
+    
+    res.json(enriched);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
+  }
+});
 
 router.get('/:approvalId', async (req: Request, res: Response) => {
   try {
@@ -81,6 +107,7 @@ router.post('/reject/:approvalId', async (req: Request, res: Response) => {
       const paymentRecord = await db.getPaymentById(approval.paymentRecordId);
       if (paymentRecord?.researchSessionId) {
         await researchRepo.updateStatus(paymentRecord.researchSessionId, ResearchState.ALTERNATIVE_DISCOVERY);
+        researchEvents.emitSessionState(paymentRecord.researchSessionId, ResearchState.ALTERNATIVE_DISCOVERY);
       }
     }
 

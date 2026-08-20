@@ -47,6 +47,7 @@ export interface PaymentRepository {
   
   createApprovalRequest(data: Omit<ApprovalRequest, 'id' | 'requestedAt'>): Promise<ApprovalRequest>;
   getApprovalRequest(id: string): Promise<ApprovalRequest | null>;
+  getApprovalRequests(): Promise<ApprovalRequest[]>;
   updateApprovalRequest(id: string, updates: Partial<ApprovalRequest>): Promise<void>;
 }
 
@@ -113,6 +114,10 @@ export class JsonPaymentRepository implements PaymentRepository {
   }
 
   async getApprovalRequest(_id: string): Promise<ApprovalRequest | null> {
+    throw new Error('Approval requests not supported in JSON repo');
+  }
+
+  async getApprovalRequests(): Promise<ApprovalRequest[]> {
     throw new Error('Approval requests not supported in JSON repo');
   }
 
@@ -226,6 +231,13 @@ export class PrismaPaymentRepository implements PaymentRepository {
     const dbRecord = await prisma.approvalRequest.findUnique({ where: { id } });
     if (!dbRecord) return null;
     return this.mapApproval(dbRecord);
+  }
+
+  async getApprovalRequests(): Promise<ApprovalRequest[]> {
+    const dbRecords = await prisma.approvalRequest.findMany({
+      orderBy: { requestedAt: 'desc' }
+    });
+    return dbRecords.map(record => this.mapApproval(record));
   }
 
   async updateApprovalRequest(id: string, updates: Partial<ApprovalRequest>): Promise<void> {

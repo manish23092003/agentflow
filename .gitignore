@@ -144,4 +144,4 @@ vite.config.ts.timestamp-*
 
 # Database files
 apps/api/data/payments.json
-
+*.db

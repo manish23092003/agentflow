@@ -9,6 +9,10 @@ import { PaymentTool } from '../agent/PaymentTool.js';
 import { PolicyEngine } from '../agent/PolicyEngine.js';
 import { SigningService } from '../security/SigningService.js';
 import type { UserSpendingPolicy } from '../agent/types.js';
+import { researchEvents } from '../research/ResearchEventService.js';
+import { ResearchState } from '../agent/ResearchStateMachine.js';
+import crypto from 'node:crypto';
+
 const researchRouter = Router();
 
 const repository = new ResearchRepository();
@@ -62,6 +66,15 @@ researchRouter.post('/start', async (req, res) => {
   }
 });
 
+researchRouter.get('/', async (req, res) => {
+  try {
+    const sessions = await repository.getSessions();
+    res.json(sessions);
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 researchRouter.get('/:id', async (req, res) => {
   try {
     const session = await repository.getSession(req.params.id);
@@ -81,6 +94,82 @@ researchRouter.get('/:id', async (req, res) => {
     });
   } catch {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+researchRouter.get('/:id/citations', async (req, res) => {
+  try {
+    const citations = await repository['db'].citation.findMany({
+      where: { researchSessionId: req.params.id },
+      orderBy: { retrievedAt: 'desc' }
+    });
+    res.json(citations);
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+researchRouter.get('/:id/payments', async (req, res) => {
+  try {
+    const allPayments = await paymentRepo.getPayments();
+    const payments = allPayments.filter(p => p.researchSessionId === req.params.id);
+    res.json(payments);
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+researchRouter.get('/:id/stream', async (req, res) => {
+  const sessionId = req.params.id;
+
+  try {
+    const session = await repository.getSession(sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    // Initial state push
+    const initialEvent = {
+      id: crypto.randomUUID(),
+      sessionId,
+      type: 'session_state',
+      timestamp: new Date().toISOString(),
+      data: { status: session.status as ResearchState }
+    };
+    
+    // Support Last-Event-ID gracefully (currently no replay beyond initial state)
+    // A robust system would load historical events from DB. 
+    // For now we just push the latest state.
+    res.write(`id: ${initialEvent.id}\n`);
+    res.write(`event: ${initialEvent.type}\n`);
+    res.write(`data: ${JSON.stringify(initialEvent)}\n\n`);
+
+    // Keepalive ping every 15 seconds
+    const keepAlive = setInterval(() => {
+      res.write(':\n\n'); // SSE Comment as keep-alive
+    }, 15000);
+
+    const unsubscribe = researchEvents.subscribe(sessionId, (event) => {
+      res.write(`id: ${event.id}\n`);
+      res.write(`event: ${event.type}\n`);
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    });
+
+    req.on('close', () => {
+      clearInterval(keepAlive);
+      unsubscribe();
+    });
+
+  } catch {
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 

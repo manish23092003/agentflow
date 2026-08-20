@@ -1,13 +1,37 @@
-# Phase 5 HITL Implementation Tasks
+# Phase 7 Step 1 Checklist
 
-- `[x]` Update `apps/api/prisma/schema.prisma` with `ApprovalRequest` details.
-- `[x]` Run `npx prisma db push` and `npx prisma generate`.
-- `[x]` Update `apps/api/src/db/PaymentHistory.ts` with `ApprovalRequest` operations.
-- `[x]` Update `apps/api/src/agent/PolicyEngine.ts` to support `REQUIRES_APPROVAL`.
-- `[x]` Update `apps/api/src/agent/PaymentTool.ts` to suspend execution and create `ApprovalRequest`.
-- `[x]` Create `apps/api/src/routes/approvals.ts` and link in `app.ts` or `agent.ts`.
-- `[x]` Implement `approve` and `reject` logic with atomic transactions and stale checks.
-- `[x]` Write automated tests for hitl scenarios.
-- `[x]` Run manual TestNet verification (Rejection & Approval).
-- `[x]` Run `npm run lint`, `npm run build`, `npm run test`.
-- `[x]` Create `docs/phase-5-hitl.md` and walkthrough.
+- `[x]` 1. Design System & Global Styles
+  - `[x]` Update `index.css` with exact design tokens
+- `[x]` 2. Install Dependencies
+  - `[x]` `react-router-dom`, `lucide-react`, `clsx`, `tailwind-merge` (optional but good, I'll stick to clsx)
+  - `[x]` Frontend testing: `jsdom`, `@testing-library/react`
+- `[x]` 3. Frontend Types & State Mapping
+  - `[x]` Create `types/research.ts`
+  - `[x]` Create `utils/statePresentation.ts`
+- `[x]` 4. API Client Foundation
+  - `[x]` Create `lib/api.ts`
+- `[x]` 5. Reusable Component Primitives
+  - `[x]` Button, IconButton
+  - `[x]` Card, Badge, Divider
+  - `[x]` StatusIndicator, ProgressBar
+  - `[x]` PageHeader, DataRow, EmptyState
+- `[x]` 6. Application Layout & Shell
+  - `[x]` `components/layout/Shell.tsx`
+  - `[x]` `components/layout/Sidebar.tsx`
+- `[x]` 7. Routing & Page Shells
+  - `[x]` Configure `react-router-dom` in `main.tsx` / `App.tsx`
+  - `[x]` `pages/Dashboard.tsx`
+  - `[x]` `pages/NewResearch.tsx`
+  - `[x]` `pages/Workspace.tsx`
+  - `[x]` `pages/History.tsx`
+  - `[x]` `pages/Approvals.tsx`
+  - `[x]` `pages/Payments.tsx`
+- `[x]` 8. Testing
+  - `[x]` `tests/setup.ts`
+  - `[x]` `statePresentation.test.ts`
+  - `[x]` `routing.test.tsx`
+- `[x]` 9. Verification
+  - `[x]` Lint, Build, Test (ensure backend is green)
+  - `[x]` Browser review via Vite
+- `[x]` 10. Documentation
+  - `[x]` `docs/phase-7-step-1-frontend-foundation.md`
