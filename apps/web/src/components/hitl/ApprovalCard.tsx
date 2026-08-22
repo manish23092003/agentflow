@@ -4,6 +4,7 @@ import { ApprovalDetails } from './ApprovalDetails';
 import { ApprovalActions, ApprovalState } from './ApprovalActions';
 import { api } from '../../lib/api';
 import { AlertCircle } from 'lucide-react';
+import { formatBaseUnits } from '../../utils/currency';
 
 interface ApprovalCardProps {
   approvalId?: string;
@@ -46,62 +47,59 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({ approvalId, session 
 
   if (loading) {
     return (
-      <div className="bg-white border-2 border-amber-300 rounded-lg p-6 shadow-sm animate-pulse" aria-busy="true">
-        <div className="h-4 bg-gray-200 rounded w-1/3 mb-3" />
-        <div className="h-10 bg-gray-100 rounded w-full mb-3" />
-        <div className="h-10 bg-gray-100 rounded w-full" />
+      <div className="mb-12 border border-[var(--color-border-subtle)] bg-[var(--color-bg-surface)] p-8 animate-pulse" aria-busy="true">
+        <div className="h-4 bg-[var(--color-border-strong)] rounded w-1/3 mb-6" />
+        <div className="h-10 bg-[var(--color-border-subtle)] rounded w-full mb-3" />
+        <div className="h-10 bg-[var(--color-border-subtle)] rounded w-full" />
       </div>
     );
   }
 
   if (!approval) {
     return (
-      <div className="bg-white border border-red-200 rounded-lg p-6 shadow-sm" role="alert">
-        <div className="flex items-center gap-2 text-red-700 mb-1">
-          <AlertCircle size={16} aria-hidden="true" />
-          <h3 className="font-semibold text-sm">Could not load approval</h3>
+      <div className="mb-12 bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] p-8" role="alert">
+        <div className="flex items-center gap-2 text-[var(--color-danger)] mb-2">
+          <AlertCircle size={18} aria-hidden="true" />
+          <h3 className="font-semibold text-base">Could not load approval</h3>
         </div>
-        <p className="text-sm text-red-600">{error || 'Unknown error. Please refresh the page.'}</p>
+        <p className="text-sm text-[var(--color-danger)] opacity-90">{error || 'Unknown error. Please refresh the page.'}</p>
       </div>
     );
   }
 
   return (
     <div
-      className="bg-white border-2 border-amber-400 rounded-lg shadow-md overflow-hidden"
+      className="mb-12 border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-8 relative overflow-hidden"
       role="dialog"
       aria-labelledby="approval-heading"
       aria-describedby="approval-description"
     >
-      {/* Accent bar */}
-      <div className="h-1 bg-amber-400 w-full" aria-hidden="true" />
+      <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-warning)]" aria-hidden="true" />
 
-      <div className="p-6">
-        <div className="flex items-start justify-between mb-3 gap-3">
-          <div>
-            <h2 id="approval-heading" className="text-lg font-semibold text-gray-900">
-              Your approval is needed
-            </h2>
-            <p id="approval-description" className="text-sm text-gray-500 mt-1">
-              The agent found a source that could improve your research, but it costs money. Review it and decide.
-            </p>
-          </div>
-          <span className="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
-            Action needed
-          </span>
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+        <div>
+          <h2 id="approval-heading" className="text-3xl font-display font-semibold text-[var(--color-text-primary)] mb-2">
+            YOUR APPROVAL IS NEEDED
+          </h2>
+          <p id="approval-description" className="text-base text-[var(--color-text-secondary)]">
+            A premium source was found.
+          </p>
         </div>
+      </div>
 
-        {error && currentState === 'FAILED' && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg" role="alert">
-            {error}
-          </div>
-        )}
+      {error && currentState === 'FAILED' && (
+        <div className="mb-6 p-4 bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] text-[var(--color-danger)] text-sm rounded-none" role="alert">
+          {error}
+        </div>
+      )}
 
-        <ApprovalDetails approval={approval} session={session} />
+      <ApprovalDetails approval={approval} session={session} />
 
+      <div className="mt-8 pt-6 border-t border-[var(--color-warning-border)]">
         <ApprovalActions
           approvalId={approval.id}
           currentState={currentState}
+          costDisplay={formatBaseUnits(approval.amount, approval.asset)}
           onStateChange={setCurrentState}
           onError={setError}
         />

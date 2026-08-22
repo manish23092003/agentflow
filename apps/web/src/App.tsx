@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Shell } from './components/layout/Shell';
+import { Landing } from './pages/Landing';
 import {
   Dashboard,
   NewResearch,
@@ -13,6 +14,8 @@ import {
 function App() {
   return (
     <Routes>
+      <Route path="/home" element={<Landing />} />
+
       <Route path="/" element={<Shell />}>
         <Route index element={<Dashboard />} />
         <Route path="research/new" element={<NewResearch />} />

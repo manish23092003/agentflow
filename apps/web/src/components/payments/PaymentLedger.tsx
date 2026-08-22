@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PaymentRecord } from '../../types/research';
-import { PaymentRow } from './PaymentRow';
+import { PaymentRow, CompactPaymentRow } from './PaymentRow';
 import { api } from '../../lib/api';
 
 interface PaymentLedgerProps {
@@ -40,58 +40,57 @@ export const PaymentLedger: React.FC<PaymentLedgerProps> = ({ sessionId, global 
 
   if (loading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm animate-pulse p-4">
-        <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-        <div className="space-y-3">
-          <div className="h-8 bg-gray-100 rounded"></div>
-          <div className="h-8 bg-gray-100 rounded"></div>
-        </div>
+      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-3)' }}>
+        Loading payments...
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white border border-red-200 rounded-lg p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-red-800">Error Loading Ledger</h3>
-        <p className="text-sm text-red-600">{error}</p>
+      <div style={{ background: 'var(--red)', color: '#fff', padding: '12px 16px', borderRadius: 'var(--radius-md)' }}>
+        <strong>Error: </strong> {error}
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-          {global ? 'Global Payment Ledger' : 'Session Payment Ledger'}
-        </h2>
-        <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded border border-gray-200 font-mono">
-          {payments.length} {payments.length === 1 ? 'Transaction' : 'Transactions'}
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border-soft)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-soft)', background: 'var(--bg-1)' }}>
+        <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
+          {global ? 'Global Payment Ledger' : 'Session Payments'}
+        </h3>
+        <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-3)' }}>
+          {payments.length} {payments.length === 1 ? 'Tx' : 'Txs'}
         </span>
       </div>
       
       {payments.length === 0 ? (
-        <div className="p-8 text-center text-gray-500 text-sm">
+        <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-3)', fontSize: 14 }}>
           No payments recorded yet.
         </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Resource / Payee</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
+      ) : global ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-strong)' }}>
+                {['Date', 'Resource / Payee', 'Amount', 'Status', 'Transaction ID'].map((h, i) => (
+                  <th key={i} style={{ padding: '12px 24px', fontSize: 12, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody>
               {payments.map(payment => (
                 <PaymentRow key={payment.id} payment={payment} />
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+          {payments.map(payment => (
+            <CompactPaymentRow key={payment.id} payment={payment} />
+          ))}
         </div>
       )}
     </div>

@@ -13,11 +13,11 @@ interface WorkspaceHeaderProps {
 }
 
 const TONE_COLORS: Record<StatePresentation['tone'], string> = {
-  info: 'blue',
-  success: 'green',
-  warning: 'amber',
-  danger: 'red',
-  neutral: 'gray'
+  info: 'text-[var(--color-accent-primary)]',
+  success: 'text-[var(--color-success)]',
+  warning: 'text-[var(--color-warning)]',
+  danger: 'text-[var(--color-danger)]',
+  neutral: 'text-[var(--color-text-secondary)]'
 };
 
 export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
@@ -36,7 +36,7 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
     icon: null
   };
 
-  const color = TONE_COLORS[presentation.tone] || 'gray';
+  const color = TONE_COLORS[presentation.tone] || 'text-[var(--color-text-secondary)]';
 
   const spentUsdc = (spent / 1_000_000).toFixed(2);
   const budgetUsdc = (totalBudget / 1_000_000).toFixed(2);
@@ -46,74 +46,72 @@ export const WorkspaceHeader: React.FC<WorkspaceHeaderProps> = ({
     switch (status) {
       case 'CONNECTED': return 'Live';
       case 'RECONNECTING': return 'Reconnecting…';
-      case 'DISCONNECTED': return 'Disconnected';
+      case 'DISCONNECTED': return 'Offline';
       default: return status;
     }
   };
 
   const getConnectionColor = (status: ConnectionStatus) => {
     switch (status) {
-      case 'CONNECTED': return 'bg-green-500';
-      case 'RECONNECTING': return 'bg-amber-500';
-      case 'DISCONNECTED': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case 'CONNECTED': return 'bg-[var(--color-success)]';
+      case 'RECONNECTING': return 'bg-[var(--color-warning)]';
+      case 'DISCONNECTED': return 'bg-[var(--color-danger)]';
+      default: return 'bg-[var(--color-text-muted)]';
     }
   };
 
   return (
-    <header className="border-b border-gray-200 bg-white px-6 py-4">
-      {/* Top row: goal + connection */}
-      <div className="flex items-start justify-between gap-4 mb-3">
-        <h1 className="text-xl font-semibold text-gray-900 leading-snug flex-1">{goal}</h1>
-        <div className="flex items-center gap-2 shrink-0 text-xs text-gray-500 pt-1">
-          <span
-            className={`w-2 h-2 rounded-full ${getConnectionColor(connectionStatus)}`}
-            aria-hidden="true"
-          />
-          <span>{getConnectionLabel(connectionStatus)}</span>
-          <span className="text-gray-300">·</span>
-          <span>Started {new Date(createdAt).toLocaleString()}</span>
-        </div>
-      </div>
-
-      {/* Status + budget row */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        {/* Status badge + description */}
-        <div
-          className="flex-1"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-${color}-100 text-${color}-800 border border-${color}-200`}
-            >
-              {presentation.label}
-            </span>
-            <span className="text-sm text-gray-600">{presentation.description}</span>
+    <header className="border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-base)] px-6 md:px-10 py-6">
+      <div className="max-w-[1600px] mx-auto">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+          <div className="flex-1">
+            <h1 className="text-xl md:text-2xl font-display font-semibold text-[var(--color-text-primary)] leading-tight mb-2 pr-4">{goal}</h1>
+            <div className="flex items-center gap-4 text-xs font-mono uppercase tracking-widest text-[var(--color-text-muted)]">
+              <span>{new Date(createdAt).toLocaleDateString()} {new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="text-[var(--color-border-strong)]">|</span>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${getConnectionColor(connectionStatus)}`}
+                  aria-hidden="true"
+                />
+                <span>{getConnectionLabel(connectionStatus)}</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Budget */}
-        <div className="shrink-0 text-right min-w-[160px]">
-          <p className="text-xs text-gray-500 mb-1 font-medium">Budget</p>
-          <p className="text-sm font-semibold text-gray-900">
-            <span className="text-gray-400">${spentUsdc}</span>
-            <span className="text-gray-400 mx-1">of</span>
-            <span>${budgetUsdc} USDC</span>
-          </p>
-          {/* Progress bar */}
-          <div className="w-full bg-gray-100 rounded-full h-1 mt-1.5">
-            <div
-              className={`h-1 rounded-full transition-all duration-500 ${
-                percentSpent > 90 ? 'bg-red-500' : percentSpent > 75 ? 'bg-amber-500' : 'bg-blue-500'
-              }`}
-              style={{ width: `${percentSpent}%` }}
-              role="progressbar"
-              aria-valuenow={parseFloat(spentUsdc)}
-              aria-valuemax={parseFloat(budgetUsdc)}
-              aria-label="Budget utilisation"
-            />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-6 border-t border-[var(--color-border-subtle)]">
+          <div
+            className="flex-1"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className={`text-sm font-semibold uppercase tracking-widest ${color}`}>
+                {presentation.label}
+              </span>
+              <span className="text-[var(--color-border-strong)]">|</span>
+              <span className="text-sm text-[var(--color-text-secondary)]">{presentation.description}</span>
+            </div>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-4 font-mono">
+            <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-widest">Spent</p>
+            <p className="text-sm font-medium text-[var(--color-text-primary)]">
+              {spentUsdc} / {budgetUsdc} USDC
+            </p>
+            <div className="w-32 bg-[var(--color-bg-surface-hover)] h-1 rounded-none overflow-hidden ml-2">
+              <div
+                className={`h-full transition-all duration-500 ${
+                  percentSpent > 90 ? 'bg-[var(--color-danger)]' : percentSpent > 75 ? 'bg-[var(--color-warning)]' : 'bg-[var(--color-text-primary)]'
+                }`}
+                style={{ width: `${percentSpent}%` }}
+                role="progressbar"
+                aria-valuenow={parseFloat(spentUsdc)}
+                aria-valuemax={parseFloat(budgetUsdc)}
+                aria-label="Budget utilisation"
+              />
+            </div>
           </div>
         </div>
       </div>

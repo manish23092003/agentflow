@@ -11,6 +11,11 @@ import { SigningService } from '../security/SigningService.js';
 import type { UserSpendingPolicy } from '../agent/types.js';
 import { researchEvents } from '../research/ResearchEventService.js';
 import { ResearchState } from '../agent/ResearchStateMachine.js';
+import { GapAnalysisService } from '../research/GapAnalysisService.js';
+import { ServiceEvaluationService } from '../research/ServiceEvaluationService.js';
+import { SynthesisService } from '../research/SynthesisService.js';
+import { ResearchOrchestrator } from '../agent/ResearchOrchestrator.js';
+import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import crypto from 'node:crypto';
 
 const researchRouter = Router();
@@ -24,6 +29,9 @@ const policyEngine = new PolicyEngine(paymentRepo);
 const signingService = new SigningService();
 const paymentTool = new PaymentTool(paymentRepo, policyEngine, signingService);
 const procurementService = new ProcurementService(repository, paymentRepo, paymentTool);
+const gapAnalysisService = new GapAnalysisService(repository);
+const serviceEvaluationService = new ServiceEvaluationService(repository, policyEngine);
+const synthesisService = new SynthesisService(repository);
 
 const mockPolicy: UserSpendingPolicy = {
   maxPerTransaction: 100000000, 
@@ -33,26 +41,36 @@ const mockPolicy: UserSpendingPolicy = {
   requireApprovalAbove: 5000
 };
 
+const orchestrator = new ResearchOrchestrator(
+  repository,
+  researchAgent,
+  gapAnalysisService,
+  serviceEvaluationService,
+  synthesisService,
+  procurementService,
+  mockPolicy
+);
+
 const StartResearchSchema = z.object({
   goal: z.string(),
   budget: z.number().int().min(0) // USDC base units
 });
 
-researchRouter.post('/start', async (req, res) => {
+researchRouter.post('/start', requireAuth, async (req, res) => {
   try {
     const data = StartResearchSchema.parse(req.body);
+    const userId = req.user!.id;
     
-    // Create the session
+    // Create the session scoped to the authenticated user
     const session = await repository.createSession(
-      'default-user', // Hardcoded user for now
+      userId,
       data.goal,
       data.budget
     );
 
-    // Run the agent synchronously in the background (fire and forget for this step, though in prod we'd queue it)
-    // For manual testing, we just let it run async
-    researchAgent.runFreeResearchPhase(session.id).catch(e => {
-      console.error('Agent failure:', e);
+    // Run the orchestrator asynchronously in the background
+    orchestrator.run(session.id).catch(e => {
+      console.error('Orchestrator failure:', e);
     });
 
     res.status(201).json(session);
@@ -66,18 +84,19 @@ researchRouter.post('/start', async (req, res) => {
   }
 });
 
-researchRouter.get('/', async (req, res) => {
+researchRouter.get('/', requireAuth, async (req, res) => {
   try {
-    const sessions = await repository.getSessions();
+    const sessions = await repository.getSessions(req.user!.id);
     res.json(sessions);
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-researchRouter.get('/:id', async (req, res) => {
+researchRouter.get('/:id', requireAuth, async (req, res) => {
   try {
-    const session = await repository.getSession(req.params.id);
+    const id = req.params.id as string;
+    const session = await repository.getSession(id, req.user!.id);
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
     }
@@ -97,10 +116,11 @@ researchRouter.get('/:id', async (req, res) => {
   }
 });
 
-researchRouter.get('/:id/citations', async (req, res) => {
+researchRouter.get('/:id/citations', requireAuth, async (req, res) => {
   try {
+    const id = req.params.id as string;
     const citations = await repository['db'].citation.findMany({
-      where: { researchSessionId: req.params.id },
+      where: { researchSessionId: id },
       orderBy: { retrievedAt: 'desc' }
     });
     res.json(citations);
@@ -109,18 +129,19 @@ researchRouter.get('/:id/citations', async (req, res) => {
   }
 });
 
-researchRouter.get('/:id/payments', async (req, res) => {
+researchRouter.get('/:id/payments', requireAuth, async (req, res) => {
   try {
-    const allPayments = await paymentRepo.getPayments();
-    const payments = allPayments.filter(p => p.researchSessionId === req.params.id);
+    const id = req.params.id as string;
+    const allPayments = await paymentRepo.getPayments(req.user!.id);
+    const payments = allPayments.filter(p => p.researchSessionId === id);
     res.json(payments);
   } catch {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-researchRouter.get('/:id/stream', async (req, res) => {
-  const sessionId = req.params.id;
+researchRouter.get('/:id/stream', optionalAuth, async (req, res) => {
+  const sessionId = req.params.id as string;
 
   try {
     const session = await repository.getSession(sessionId);
@@ -177,11 +198,12 @@ const ProcureSchema = z.object({
   recommendationId: z.string()
 });
 
-researchRouter.post('/:id/procure', async (req, res) => {
+researchRouter.post('/:id/procure', requireAuth, async (req, res) => {
   try {
+    const id = req.params.id as string;
     const { recommendationId } = ProcureSchema.parse(req.body);
     const result = await procurementService.executeProcurement(
-      req.params.id,
+      id,
       recommendationId,
       mockPolicy
     );

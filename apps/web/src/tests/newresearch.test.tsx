@@ -26,6 +26,9 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 import { api } from '../lib/api';
 
+// The actual placeholder text used in the redesigned NewResearch page
+const TEXTAREA_PLACEHOLDER = 'Research the impact of AI on hiring in the Indian IT industry in 2026...';
+
 const renderNewResearch = () =>
   render(
     <MemoryRouter initialEntries={['/research/new']}>
@@ -44,8 +47,8 @@ describe('NewResearch — Start Research button', () => {
     renderNewResearch();
     expect(screen.getByText('New Research')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /start research/i })).toBeInTheDocument();
-    expect(screen.getByLabelText('What do you want to research?')).toBeInTheDocument();
-    expect(screen.getByLabelText('Maximum budget')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(TEXTAREA_PLACEHOLDER)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('5.00')).toBeInTheDocument();
     // Ensure old Deploy Agent label is gone
     expect(screen.queryByText(/deploy agent/i)).not.toBeInTheDocument();
     // Ensure old Initialize Research label is gone
@@ -54,15 +57,17 @@ describe('NewResearch — Start Research button', () => {
 
   it('renders 3 example prompts', () => {
     renderNewResearch();
-    const prompts = screen.getAllByRole('button', { name: /use example/i });
-    expect(prompts.length).toBe(3);
+    // Example chips render the full prompt text as their accessible name
+    const chips = screen.getAllByRole('button', { name: /Research the impact|Analyse the current|Summarise recent/i });
+    expect(chips.length).toBe(3);
   });
 
   it('clicking an example prompt fills the textarea', () => {
     renderNewResearch();
-    const prompts = screen.getAllByRole('button', { name: /use example/i });
-    fireEvent.click(prompts[0]);
-    const textarea = screen.getByLabelText('What do you want to research?') as HTMLTextAreaElement;
+    // Click the first example chip
+    const firstChip = screen.getByRole('button', { name: /Research the impact of AI on hiring/i });
+    fireEvent.click(firstChip);
+    const textarea = screen.getByPlaceholderText(TEXTAREA_PLACEHOLDER) as HTMLTextAreaElement;
     expect(textarea.value).not.toBe('');
   });
 
@@ -79,10 +84,10 @@ describe('NewResearch — Start Research button', () => {
 
   it('shows validation error when budget is invalid', async () => {
     renderNewResearch();
-    fireEvent.change(screen.getByLabelText('What do you want to research?'), {
+    fireEvent.change(screen.getByPlaceholderText(TEXTAREA_PLACEHOLDER), {
       target: { value: 'Test goal' }
     });
-    fireEvent.change(screen.getByLabelText('Maximum budget'), {
+    fireEvent.change(screen.getByDisplayValue('5.00'), {
       target: { value: '-1' }
     });
     fireEvent.click(screen.getByRole('button', { name: /start research/i }));
@@ -96,10 +101,10 @@ describe('NewResearch — Start Research button', () => {
     (api.startResearch as any).mockResolvedValue({ id: 'session-abc', goal: 'Test goal', status: 'CREATED' });
     renderNewResearch();
 
-    fireEvent.change(screen.getByLabelText('What do you want to research?'), {
+    fireEvent.change(screen.getByPlaceholderText(TEXTAREA_PLACEHOLDER), {
       target: { value: 'Test research goal' }
     });
-    fireEvent.change(screen.getByLabelText('Maximum budget'), {
+    fireEvent.change(screen.getByDisplayValue('5.00'), {
       target: { value: '2.50' }
     });
     fireEvent.click(screen.getByRole('button', { name: /start research/i }));
@@ -115,14 +120,15 @@ describe('NewResearch — Start Research button', () => {
     (api.startResearch as any).mockReturnValue(new Promise(() => {}));
     renderNewResearch();
 
-    fireEvent.change(screen.getByLabelText('What do you want to research?'), {
+    fireEvent.change(screen.getByPlaceholderText(TEXTAREA_PLACEHOLDER), {
       target: { value: 'Test goal' }
     });
     fireEvent.click(screen.getByRole('button', { name: /start research/i }));
 
     await waitFor(() => {
+      // Button shows 'Starting...' while loading
       expect(screen.getByRole('button', { name: /starting/i })).toBeDisabled();
-      expect(screen.getByLabelText('What do you want to research?')).toBeDisabled();
+      expect(screen.getByPlaceholderText(TEXTAREA_PLACEHOLDER)).toBeDisabled();
     });
   });
 
@@ -130,7 +136,7 @@ describe('NewResearch — Start Research button', () => {
     (api.startResearch as any).mockRejectedValue(new Error('Internal server error'));
     renderNewResearch();
 
-    fireEvent.change(screen.getByLabelText('What do you want to research?'), {
+    fireEvent.change(screen.getByPlaceholderText(TEXTAREA_PLACEHOLDER), {
       target: { value: 'Test goal' }
     });
     fireEvent.click(screen.getByRole('button', { name: /start research/i }));
@@ -147,7 +153,7 @@ describe('NewResearch — Start Research button', () => {
     (api.startResearch as any).mockResolvedValue({ id: 'session-xyz', goal: 'Test', status: 'CREATED' });
     renderNewResearch();
 
-    fireEvent.change(screen.getByLabelText('What do you want to research?'), {
+    fireEvent.change(screen.getByPlaceholderText(TEXTAREA_PLACEHOLDER), {
       target: { value: 'Test goal' }
     });
     fireEvent.click(screen.getByRole('button', { name: /start research/i }));

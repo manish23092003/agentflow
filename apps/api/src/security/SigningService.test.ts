@@ -31,4 +31,20 @@ describe('SigningService', () => {
       expect(errorMsg).toContain('X402_CLIENT_MNEMONIC');
     }
   });
+
+  it('rejects server-side payer mode in production when ALLOW_SERVER_PAYER is not true', () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalAllow = process.env.ALLOW_SERVER_PAYER;
+    try {
+      process.env.NODE_ENV = 'production';
+      delete process.env.ALLOW_SERVER_PAYER;
+      
+      expect(() => new SigningService()).toThrow(
+        /Server-side payer is disabled in production mode/
+      );
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      if (originalAllow) process.env.ALLOW_SERVER_PAYER = originalAllow;
+    }
+  });
 });

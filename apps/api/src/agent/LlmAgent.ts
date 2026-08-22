@@ -4,6 +4,7 @@ import type { PaymentTool } from './PaymentTool.js';
 import type { UserSpendingPolicy, AgentResponse } from './types.js';
 import { memoryStore } from './memory.js';
 import { createPaymentLLMTool } from './tools.js';
+import { parseLlmError } from './errors.js';
 
 const SYSTEM_PROMPT = `You are AgentFlow, a highly capable task-oriented procurement AI agent.
 Your goal is to fulfill the user's research and data retrieval tasks.
@@ -60,10 +61,10 @@ export class LlmAgent {
         }
       };
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const llmError = parseLlmError(error);
       return {
         sessionId: id,
-        message: `Agent execution failed: ${msg}`,
+        message: `Agent execution failed: ${llmError.message}`,
         metadata: {
           model: this.provider.modelName,
           toolCalls: [],

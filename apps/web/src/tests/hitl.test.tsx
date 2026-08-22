@@ -61,10 +61,10 @@ describe('HITL & Payment Components', () => {
       render(<ApprovalCard approvalId="app-1" session={mockSession} />);
       
       await waitFor(() => {
-        expect(screen.getByText('Your approval is needed')).toBeInTheDocument();
+        expect(screen.getByText(/YOUR APPROVAL IS NEEDED/i)).toBeInTheDocument();
         expect(screen.getByText('example.com/premium')).toBeInTheDocument();
         expect(screen.getByText('0.05 USDC')).toBeInTheDocument();
-        expect(screen.getByText('Valuable dataset')).toBeInTheDocument();
+        expect(screen.getByText(/Valuable dataset/i)).toBeInTheDocument();
       });
     });
 
@@ -104,9 +104,9 @@ describe('HITL & Payment Components', () => {
       
       render(<ApprovalCard approvalId="app-1" session={mockSession} />);
       
-      await waitFor(() => expect(screen.getByText('Approve Purchase')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Approve 0.05 USDC/i)).toBeInTheDocument());
       
-      fireEvent.click(screen.getByText('Approve Purchase'));
+      fireEvent.click(screen.getByText(/Approve 0.05 USDC/i));
       
       await waitFor(() => {
         expect(api.approve).toHaveBeenCalledWith('app-1');
@@ -120,9 +120,9 @@ describe('HITL & Payment Components', () => {
       
       render(<ApprovalCard approvalId="app-1" session={mockSession} />);
       
-      await waitFor(() => expect(screen.getByText('Reject & Continue Without It')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByRole('button', { name: /reject|decline/i })).toBeInTheDocument());
       
-      fireEvent.click(screen.getByText('Reject & Continue Without It'));
+      fireEvent.click(screen.getByRole('button', { name: /reject|decline/i }));
       
       await waitFor(() => {
         expect(api.reject).toHaveBeenCalledWith('app-1');
@@ -136,9 +136,9 @@ describe('HITL & Payment Components', () => {
       
       render(<ApprovalCard approvalId="app-1" session={mockSession} />);
       
-      await waitFor(() => expect(screen.getByText('Approve Purchase')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Approve/i)).toBeInTheDocument());
       
-      fireEvent.click(screen.getByText('Approve Purchase'));
+      fireEvent.click(screen.getByText(/Approve/i));
       
       await waitFor(() => {
         expect(screen.getByText('Something went wrong while processing the approval. Please try again.')).toBeInTheDocument();
@@ -151,8 +151,8 @@ describe('HITL & Payment Components', () => {
       
       render(<ApprovalCard approvalId="app-1" session={mockSession} />);
       
-      await waitFor(() => expect(screen.getByText('Approve Purchase')).toBeInTheDocument());
-      fireEvent.click(screen.getByText('Approve Purchase'));
+      await waitFor(() => expect(screen.getByText(/Approve/i)).toBeInTheDocument());
+      fireEvent.click(screen.getByText(/Approve/i));
       
       await waitFor(() => {
         expect(screen.getByText('This request has expired. The agent will automatically look for an alternative source.')).toBeInTheDocument();
@@ -181,7 +181,7 @@ describe('HITL & Payment Components', () => {
       render(<PaymentLedger sessionId="session-123" />);
       
       await waitFor(() => {
-        expect(screen.getByText('Session Payment Ledger')).toBeInTheDocument();
+        expect(screen.getByText('Session Payments')).toBeInTheDocument();
         expect(screen.getByText('1.50 USDC')).toBeInTheDocument();
         expect(screen.getByText('SUCCESS')).toBeInTheDocument();
       });
@@ -214,7 +214,7 @@ describe('HITL & Payment Components', () => {
       render(<PaymentLedger sessionId="session-123" />);
       
       await waitFor(() => {
-        expect(screen.getByText('Error Loading Ledger')).toBeInTheDocument();
+        expect(screen.getByText('Ledger Error')).toBeInTheDocument();
         expect(screen.getByText('Ledger error')).toBeInTheDocument();
       });
     });

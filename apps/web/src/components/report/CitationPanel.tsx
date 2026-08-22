@@ -10,9 +10,9 @@ interface CitationPanelProps {
 export const CitationPanel: React.FC<CitationPanelProps> = ({ citations, payments }) => {
   if (!citations || citations.length === 0) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="text-sm font-medium text-gray-900 mb-4 uppercase tracking-wider">Sources</h3>
-        <p className="text-sm text-gray-500">No sources available yet.</p>
+      <div className="py-8 border-t border-[var(--color-border-subtle)]">
+        <h3 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-4">Sources</h3>
+        <p className="text-sm text-[var(--color-text-muted)] italic">No sources available yet.</p>
       </div>
     );
   }
@@ -25,15 +25,12 @@ export const CitationPanel: React.FC<CitationPanelProps> = ({ citations, payment
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col h-full max-h-[800px]">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-900 uppercase tracking-wider">Sources</h3>
-        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-          {citations.length} items
-        </span>
+    <div className="py-8 border-t border-[var(--color-border-subtle)] flex flex-col h-full max-h-[800px]">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">Sources ({citations.length})</h3>
       </div>
       
-      <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+      <div className="flex-1 overflow-y-auto pr-2 space-y-6 custom-scrollbar">
         {citations.map((citation, index) => (
           <CitationItem 
             key={citation.id} 

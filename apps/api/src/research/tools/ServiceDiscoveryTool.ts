@@ -43,8 +43,14 @@ Input a specific topic to search for.`,
         remainingBudget
       );
 
-      // 3. Define allowed parameters based on config (hardcoded to AgentFlow config for now)
-      const allowedNetworks = [config.x402.network];
+      // 3. Define allowed parameters based on config
+      const allowedNetworks = [
+        config.x402.network,
+        'testnet',
+        'algorand-testnet',
+        'algorand:testnet',
+        'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI='
+      ];
       const allowedAssets = [config.algorand.usdcAssetId];
 
       console.log(`[ServiceDiscoveryTool] Searching for '${topic}' (Max Price Base Units: ${effectiveMaxPriceBaseUnits})`);

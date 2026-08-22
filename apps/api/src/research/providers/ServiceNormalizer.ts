@@ -51,6 +51,7 @@ export class ServiceNormalizer {
       if (options?.allowedNetworks && options.allowedNetworks.length > 0) {
         if (!options.allowedNetworks.includes(option.network)) continue;
       }
+
       if (options?.allowedAssets && options.allowedAssets.length > 0) {
         if (!options.allowedAssets.includes(option.asset)) continue;
       }

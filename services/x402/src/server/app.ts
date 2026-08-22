@@ -35,6 +35,30 @@ export function createApp(config: RuntimeConfig) {
     });
   });
 
+  // Protected demo premium research endpoint
+  app.get('/research/premium', async (c) => {
+    // Only reached if x402 middleware verifies payment
+    return c.json({
+      title: 'AI Agents Market Growth Report 2026',
+      topic: 'Latest trends and market growth of AI agents in 2026',
+      type: 'premium_research',
+      dataType: 'demo',
+      summary: "Illustrative premium research demonstrating AgentFlow's paid-resource procurement flow.",
+      marketInsights: [
+        'Illustrative enterprise adoption trend for autonomous AI agents.',
+        'Illustrative growth trend across agentic software workflows.',
+        'Illustrative reduction in task execution costs.'
+      ],
+      trends: [
+        'Stateful agentic workflows',
+        'Multi-agent orchestration',
+        'Tool-using autonomous agents'
+      ],
+      source: 'AgentFlow Premium Research Provider',
+      access: 'paid'
+    });
+  });
+
   app.notFound(c => c.json({ error: 'not_found', message: 'Route not found.' }, 404));
   
   app.onError((error, c) => {

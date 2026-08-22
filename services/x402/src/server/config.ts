@@ -110,6 +110,25 @@ export function createX402Middleware(config: RuntimeConfig) {
         mimeType: 'application/json',
         extensions: discovery,
       },
+      'GET /research/premium': {
+        accepts: [
+          {
+            scheme: 'exact',
+            price: '0.10',
+            // @ts-expect-error - Required for actual token amount
+            amount: '100000',
+            network: config.network,
+            asset: config.usdcAssetId,
+            payTo: config.payTo,
+            extra: {
+              asset: Number(config.usdcAssetId),
+            },
+          },
+        ],
+        description: 'AgentFlow Premium AI Agents Market Growth Research Report (Demo)',
+        mimeType: 'application/json',
+        extensions: discovery,
+      },
     },
     server,
   );

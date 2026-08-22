@@ -36,9 +36,37 @@ describe('AgentFlow x402 Server', () => {
     expect(decoded.accepts.length).toBeGreaterThan(0);
     
     const req = decoded.accepts[0];
-    expect(req.amount).toBe('100000'); // 0.10 USDC with 6 decimals
     expect(req.network).toBe(EXACT_TESTNET_CAIP2);
-    expect(req.extra.asset).toBe('10458941');
+    expect(req.extra.asset).toBe(10458941);
+  });
+
+  it('should return 402 for /research/premium with exact 0.10 USDC (100000 base units) requirement', { timeout: 15000 }, async () => {
+    const res = await app.request('/research/premium');
+    expect(res.status).toBe(402);
+
+    const paymentRequired = res.headers.get('payment-required');
+    expect(paymentRequired).toBeTruthy();
+
+    const decoded = JSON.parse(Buffer.from(paymentRequired!, 'base64url').toString('utf8'));
+    expect(decoded.accepts).toBeDefined();
+    expect(decoded.accepts.length).toBeGreaterThan(0);
+
+    const req = decoded.accepts[0];
+    expect(req.scheme).toBe('exact');
+    expect(req.amount).toBe('100000');
+    expect(req.asset).toBe('10458941');
+    expect(req.network).toBe(EXACT_TESTNET_CAIP2);
+    expect(req.payTo).toBe(mockConfig.payTo);
+    expect(req.extra.asset).toBe(10458941);
+  });
+
+  it('should reject requests with invalid authorization header', { timeout: 15000 }, async () => {
+    const res = await app.request('/research/premium', {
+      headers: {
+        authorization: 'Bearer invalid-token'
+      }
+    });
+    expect(res.status).toBe(402);
   });
 
   it('should include request IDs in errors', async () => {

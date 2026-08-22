@@ -3,10 +3,15 @@ import { PaymentLedger } from '../components/payments/PaymentLedger';
 
 export const Payments = () => {
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Payment History</h1>
-        <p className="text-sm text-gray-500 mt-1">A complete ledger of all autonomous procurement transactions across all research sessions.</p>
+    <div className="page">
+      <div className="eyebrow">Ledger</div>
+      <div className="page-header-row" style={{ marginTop: 0, marginBottom: 32 }}>
+        <div>
+          <h1 className="hero-title" style={{ fontSize: 32, margin: 0 }}>Payment History</h1>
+          <p style={{ color: 'var(--text-3)', fontSize: 14, marginTop: 4 }}>
+            A complete ledger of all autonomous procurement transactions across all research sessions.
+          </p>
+        </div>
       </div>
 
       <PaymentLedger global={true} />

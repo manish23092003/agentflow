@@ -8,6 +8,7 @@ import readyRouter from "./routes/ready.js";
 
 import helmet from "helmet";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 
 /**
  * Centralized logger instance for the API.
@@ -26,21 +27,25 @@ const app = express();
 app.use(helmet());
 app.use(cors({
   origin: config.env === "development" ? "http://localhost:5173" : false, // Adjust in production
+  credentials: true,
   optionsSuccessStatus: 200,
 }));
 
 // --- Core middleware ---
 app.use(express.json({ limit: "100kb" }));
+app.use(cookieParser());
 app.use(requestIdMiddleware);
 
 import agentRouter from "./routes/agent.js";
 import approvalsRouter from "./routes/approvals.js";
 import researchRouter from "./routes/research.js";
 import paymentsRouter from "./routes/payments.js";
+import authRouter from "./routes/auth.js";
 
 // --- API routes (versioned) ---
 app.use("/api/v1", healthRouter);
 app.use("/api/v1", readyRouter);
+app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/agent", agentRouter);
 app.use("/api/v1/agent", approvalsRouter);
 app.use("/api/v1/research", researchRouter);

@@ -5,13 +5,20 @@ export class SigningService {
   private fetchWithPayment: typeof fetch;
 
   constructor() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const allowServerPayer = process.env.ALLOW_SERVER_PAYER === 'true' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
+
+    if (isProduction && !allowServerPayer) {
+      throw new Error('SigningService: Server-side payer is disabled in production mode. User payments must be signed via connected client wallet (e.g. Pera Wallet).');
+    }
+
     const mnemonic = process.env.X402_CLIENT_MNEMONIC?.trim();
     if (!mnemonic) {
       throw new Error('SigningService: X402_CLIENT_MNEMONIC is missing.');
     }
     
     const network = process.env.ALGORAND_NETWORK === 'mainnet' ? 'mainnet' : 'testnet';
-    console.log('SigningService constructor loaded mnemonic starting with:', mnemonic.substring(0, 10));
+    // Initialize paying client using the mnemonic.
     const payingClient = createAvmPayingClient(mnemonic, network);
     
     // We store the bound fetchWithPayment function.

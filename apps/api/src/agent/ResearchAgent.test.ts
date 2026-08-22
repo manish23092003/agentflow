@@ -39,34 +39,34 @@ describe('ResearchAgent', () => {
   });
 
   it('should transition to FAILED on 429 quota error', async () => {
-    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.CREATED, goal: 'test' } as any);
+    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.RESEARCHING_FREE, goal: 'test' } as any);
     
     vi.mocked(generateText).mockRejectedValue({ statusCode: 429 });
 
     await expect(agent.runFreeResearchPhase('1')).rejects.toThrowError(LLMExecutionError);
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, expect.any(String));
   });
 
   it('should transition to FAILED on generic provider error', async () => {
-    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.CREATED, goal: 'test' } as any);
+    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.RESEARCHING_FREE, goal: 'test' } as any);
     
     vi.mocked(generateText).mockRejectedValue(new Error('Some API error'));
 
     await expect(agent.runFreeResearchPhase('1')).rejects.toThrowError(LLMExecutionError);
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, expect.any(String));
   });
 
   it('should transition to FAILED on empty LLM response with zero tool calls', async () => {
-    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.CREATED, goal: 'test' } as any);
+    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.RESEARCHING_FREE, goal: 'test' } as any);
     
     vi.mocked(generateText).mockResolvedValue({ text: '', toolCalls: [] } as any);
 
     await expect(agent.runFreeResearchPhase('1')).rejects.toThrowError(LLMExecutionError);
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, expect.any(String));
   });
 
   it('should transition to FAILED if zero citations are persisted', async () => {
-    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.CREATED, goal: 'test' } as any);
+    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.RESEARCHING_FREE, goal: 'test' } as any);
     (repository as any).db.citation.count.mockResolvedValue(0);
     
     vi.mocked(generateText).mockResolvedValue({
@@ -75,11 +75,11 @@ describe('ResearchAgent', () => {
     } as any);
 
     await expect(agent.runFreeResearchPhase('1')).rejects.toThrowError(LLMExecutionError);
-    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED);
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.FAILED, expect.any(String));
   });
 
   it('should complete successfully if citations exist', async () => {
-    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.CREATED, goal: 'test' } as any);
+    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.RESEARCHING_FREE, goal: 'test' } as any);
     (repository as any).db.citation.count.mockResolvedValue(2);
     
     vi.mocked(generateText).mockResolvedValue({

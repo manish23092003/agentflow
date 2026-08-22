@@ -1,14 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { PrismaPaymentRepository } from '../db/PaymentHistory.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 const db = new PrismaPaymentRepository();
 
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
-    const payments = await db.getPayments();
-    // Sort descending by timestamp
-    payments.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const userId = req.user!.id;
+    const payments = await db.getPayments(userId);
     res.json(payments);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

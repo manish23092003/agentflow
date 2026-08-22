@@ -5,7 +5,7 @@ import type { WebSearchProvider } from '../research/types.js';
 import { WebSearchTool } from '../research/tools/WebSearchTool.js';
 import { ResearchStateMachine, ResearchState } from './ResearchStateMachine.js';
 import { config } from '../config.js';
-import { LLMExecutionError } from './errors.js';
+import { LLMExecutionError, parseLlmError } from './errors.js';
 import { researchEvents } from '../research/ResearchEventService.js';
 
 export class ResearchAgent {
@@ -22,9 +22,9 @@ export class ResearchAgent {
     const session = await this.repository.getSession(sessionId);
     if (!session) throw new Error('Research session not found');
 
-    ResearchStateMachine.validateTransition(session.status as ResearchState, ResearchState.RESEARCHING_FREE);
-    await this.repository.updateStatus(sessionId, ResearchState.RESEARCHING_FREE);
-    researchEvents.emitSessionState(sessionId, ResearchState.RESEARCHING_FREE);
+    if (session.status !== ResearchState.RESEARCHING_FREE) {
+      throw new Error(`Invalid state: Expected RESEARCHING_FREE, got ${session.status}`);
+    }
 
     const systemPrompt = `You are an autonomous research agent. Your goal is: "${session.goal}"
 You are currently in the FREE RESEARCH phase.
@@ -37,9 +37,11 @@ When you are satisfied that you have exhausted free search options for this phas
     const model = llmProvider.getModel();
 
     try {
-      console.log(`[Diagnostic] Model Name: "google" - "gemini-3.6-flash"`);
+      console.log(`[Diagnostic] Model Name: "google" - "${config.geminiModel}"`);
       console.log(`[Diagnostic] Gemini provider initialized successfully`);
       
+      const toolDef = this.webSearchTool.getDefinition(sessionId);
+
       const result = await generateText({
         model,
         system: systemPrompt,
@@ -47,10 +49,10 @@ When you are satisfied that you have exhausted free search options for this phas
           { role: 'user', content: `The goal is: "${session.goal}". Please call the webSearchTool to research this topic right now.` }
         ],
         tools: {
-          webSearchTool: this.webSearchTool.getDefinition(sessionId),
+          webSearchTool: toolDef,
         },
-        toolChoice: 'auto',
-        // maxSteps: 5, // Gemini will automatically call the tool, then send the tool result back for the final answer
+        toolChoice: 'required',
+        maxRetries: 3,
       });
 
       console.log(`[Diagnostic] LLM returned text: "${result.text}"`);
@@ -63,10 +65,27 @@ When you are satisfied that you have exhausted free search options for this phas
           false
         );
       }
+
+      for (const call of result.toolCalls) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawCall = call as any;
+        if (rawCall.toolName === 'webSearchTool' && typeof toolDef.execute === 'function') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (toolDef.execute as any)(rawCall.args || rawCall.input || { query: session.goal });
+        }
+      }
       
       const citations = await this.repository['db'].citation.count({
         where: { researchSessionId: sessionId }
       });
+      
+      if (citations === 0) {
+        throw new LLMExecutionError(
+          'NO_CITATIONS_PERSISTED',
+          'The free research phase produced 0 citations.',
+          false
+        );
+      }
       
       if (citations === 0) {
         throw new LLMExecutionError(
@@ -84,27 +103,11 @@ When you are satisfied that you have exhausted free search options for this phas
     } catch (error: unknown) {
       console.error('[ResearchAgent] Execution failed:', error);
 
-      let code = 'LLM_ERROR';
-      let message = error instanceof Error ? error.message : String(error);
-      let retryable = false;
+      const llmError = parseLlmError(error);
 
-      if (error instanceof LLMExecutionError) {
-        code = error.code;
-        message = error.message;
-        retryable = error.retryable;
-      } else if (error && typeof error === 'object') {
-        const err = error as Record<string, unknown>;
-        if (err.statusCode === 429 || message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
-          code = 'LLM_QUOTA_EXCEEDED';
-          retryable = true;
-        } else if (err.name === 'APICallError') {
-          code = 'LLM_API_ERROR';
-        }
-      }
-
-      await this.repository.updateStatus(sessionId, ResearchState.FAILED);
-      researchEvents.emitResearchFailed(sessionId, message);
-      throw new LLMExecutionError(code, message, retryable);
+      await this.repository.updateStatus(sessionId, ResearchState.FAILED, llmError.message);
+      researchEvents.emitResearchFailed(sessionId, llmError.message);
+      throw llmError;
     }
   }
 }

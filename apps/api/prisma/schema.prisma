@@ -7,9 +7,67 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+model User {
+  id                   String            @id @default(uuid())
+  email                String            @unique
+  name                 String
+  passwordHash         String?
+  googleId             String?           @unique
+  avatarUrl            String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  sessions             Session[]
+  wallets              UserWallet[]
+  researchSessions     ResearchSession[]
+  paymentRecords       PaymentRecord[]
+  challenges           WalletChallenge[]
+}
+
+model Session {
+  id                   String            @id @default(uuid())
+  userId               String
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash            String            @unique
+  expiresAt            DateTime
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model WalletChallenge {
+  id                   String            @id @default(uuid())
+  userId               String
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address              String
+  nonce                String            @unique
+  expiresAt            DateTime
+  createdAt            DateTime          @default(now())
+
+  @@index([userId, address])
+}
+
+model UserWallet {
+  id                   String            @id @default(uuid())
+  userId               String
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address              String
+  network              String            @default("testnet")
+  label                String?
+  isPrimary            Boolean           @default(true)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@unique([userId, address, network])
+  @@index([userId])
+  @@index([address])
+}
+
 model UserSpendingPolicy {
-  id                   String   @id @default(uuid())
-  userId               String   @unique
+  id                   String            @id @default(uuid())
+  userId               String            @unique
   maxPerTransaction    Int
   dailyLimit           Int
   // Stored as JSON string since SQLite doesn't support arrays
@@ -17,46 +75,54 @@ model UserSpendingPolicy {
   // Stored as JSON string since SQLite doesn't support arrays
   allowedNetworks      String
   requireApprovalAbove Int
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 }
 
 model PaymentRecord {
-  id                   String   @id @default(uuid())
-  transactionId        String?  // Optional until settlement
+  id                   String            @id @default(uuid())
+  transactionId        String?           // Optional until settlement
   amount               Int
   asset                String
   receiver             String
   network              String
-  decision             String   // APPROVED | DENIED | REQUIRES_APPROVAL
-  status               String   // PENDING | SUCCESS | FAILED
+  decision             String            // APPROVED | DENIED | REQUIRES_APPROVAL
+  status               String            // PENDING | SUCCESS | FAILED
   agentAction          String
-  createdAt            DateTime @default(now())
+  createdAt            DateTime          @default(now())
+
+  userId               String?
+  user                 User?             @relation(fields: [userId], references: [id])
+  payerAddress         String?
 
   researchSessionId    String?
-  ResearchSession      ResearchSession? @relation(fields: [researchSessionId], references: [id])
+  ResearchSession      ResearchSession?  @relation(fields: [researchSessionId], references: [id])
+
+  @@index([userId])
+  @@index([payerAddress])
+  @@index([transactionId])
 }
 
 model AgentSession {
-  id                   String   @id @default(uuid())
+  id                   String            @id @default(uuid())
   userId               String
-  conversationId       String   @unique
+  conversationId       String            @unique
   status               String
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 }
 
 model ApprovalRequest {
-  id                   String   @id @default(uuid())
-  paymentRecordId      String   @unique
-  status               String   // PENDING | APPROVED | REJECTED | EXPIRED | CANCELLED
+  id                   String            @id @default(uuid())
+  paymentRecordId      String            @unique
+  status               String            // PENDING | APPROVED | REJECTED | EXPIRED | CANCELLED
   resourceUrl          String
   amount               Int
   asset                String
   network              String
   payTo                String
   reason               String
-  requestedAt          DateTime @default(now())
+  requestedAt          DateTime          @default(now())
   expiresAt            DateTime
   approvedAt           DateTime?
   rejectedAt           DateTime?
@@ -71,6 +137,7 @@ model ApprovalRequest {
 model ResearchSession {
   id              String   @id @default(uuid())
   userId          String
+  user            User?    @relation(fields: [userId], references: [id])
   goal            String
   status          String   // See State Machine below
   
@@ -81,11 +148,14 @@ model ResearchSession {
   updatedAt       DateTime @updatedAt
   
   failureReason   String?
+  report          String?
   
   citations       Citation[]
   payments        PaymentRecord[] // Related payments for expense tracking
   recommendations PaidResourceRecommendation[]
   gaps            ResearchGap[]
+
+  @@index([userId])
 }
 
 model Citation {

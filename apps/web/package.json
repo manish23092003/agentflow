@@ -9,11 +9,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@perawallet/connect": "^1.6.0",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "@react-three/postprocessing": "^3.0.5",
+    "@types/three": "^0.185.4",
+    "algosdk": "^3.7.0",
     "clsx": "^2.1.1",
+    "framer-motion": "^13.1.1",
     "lucide-react": "^1.32.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.18.2"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.18.2",
+    "remark-gfm": "^4.0.1",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

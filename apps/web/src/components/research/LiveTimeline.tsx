@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BaseEvent } from '../../types/index.js';
 import { STATE_PRESENTATION } from '../../utils/statePresentation.js';
 import { ResearchState } from '../../types/research.js';
@@ -15,8 +15,8 @@ const getEventLabel = (e: BaseEvent): string => {
       return p ? p.label : `Status: ${status}`;
     }
     case 'citation_added': {
-      const title = e.data?.citation?.title;
-      const provider = e.data?.citation?.providerName || e.data?.citation?.provider;
+      const title = e.data?.title || e.data?.citation?.title;
+      const provider = e.data?.providerName || e.data?.provider || e.data?.citation?.providerName || e.data?.citation?.provider;
       if (title) return `Found a source: ${title}`;
       if (provider) return `Found a source from ${provider}`;
       return 'Found a source';
@@ -44,83 +44,92 @@ const getEventLabel = (e: BaseEvent): string => {
   }
 };
 
-const getEventIcon = (type: string): string => {
-  switch (type) {
-    case 'session_state': return '↻';
-    case 'agent_action': return '◉';
-    case 'citation_added': return '📄';
-    case 'service_discovered': return '🔍';
-    case 'service_evaluated': return '⚖';
-    case 'approval_required': return '❕';
-    case 'payment_started': return '→';
-    case 'payment_settled': return '✓';
-    case 'resource_acquired': return '🔓';
-    case 'research_completed': return '✓';
-    case 'research_failed': return '✕';
-    default: return '·';
-  }
-};
-
 const getEventToneClass = (type: string): string => {
   switch (type) {
     case 'research_completed':
     case 'payment_settled':
     case 'resource_acquired':
-      return 'bg-green-50 border-green-200 text-green-700';
+      return 'text-[var(--color-success)] border-[var(--color-success-border)] bg-[var(--color-success-bg)]';
     case 'approval_required':
-      return 'bg-amber-50 border-amber-200 text-amber-700';
+      return 'text-[var(--color-warning)] border-[var(--color-warning-border)] bg-[var(--color-warning-bg)]';
     case 'research_failed':
-      return 'bg-red-50 border-red-200 text-red-700';
+      return 'text-[var(--color-danger)] border-[var(--color-danger-border)] bg-[var(--color-danger-bg)]';
     default:
-      return 'bg-gray-50 border-gray-200 text-gray-600';
+      return 'text-[var(--color-text-secondary)] border-[var(--color-border-strong)] bg-[var(--color-bg-surface-hover)]';
   }
 };
 
 export const LiveTimeline: React.FC<LiveTimelineProps> = ({ events }) => {
+  const [showTechnical, setShowTechnical] = useState(false);
   const reversed = [...events].reverse();
 
+  // Filter events based on toggle
+  const displayEvents = reversed.filter(e => {
+    if (showTechnical) return true;
+    const semanticTypes = [
+      'session_state',
+      'citation_added',
+      'approval_required',
+      'payment_started',
+      'payment_settled',
+      'resource_acquired',
+      'research_completed',
+      'research_failed'
+    ];
+    return semanticTypes.includes(e.type);
+  });
+
   return (
-    <section aria-label="Agent activity" className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Agent Activity</h3>
-      <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1" role="log" aria-live="polite" aria-relevant="additions">
-        {reversed.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">Waiting for activity…</p>
+    <section aria-label="Agent activity" className="pt-8 border-t border-[var(--color-border-subtle)]">
+      <div className="flex items-center justify-between mb-8">
+        <h3 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">Activity</h3>
+        <button 
+          onClick={() => setShowTechnical(!showTechnical)}
+          className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors uppercase tracking-widest font-semibold focus:outline-none"
+        >
+          {showTechnical ? 'Hide technical' : 'View technical'}
+        </button>
+      </div>
+      <div className="space-y-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar" role="log" aria-live="polite" aria-relevant="additions">
+        {displayEvents.length === 0 ? (
+          <p className="text-sm text-[var(--color-text-muted)] italic">Waiting for activity…</p>
         ) : (
-          reversed.map((event, idx) => (
-            <div
-              key={event.id}
-              className={`relative pl-7 ${idx === 0 ? 'opacity-100' : 'opacity-70'} transition-opacity duration-300`}
-            >
-              {/* Timeline connector */}
-              {idx !== reversed.length - 1 && (
-                <div className="absolute left-[10px] top-5 bottom-[-12px] w-px bg-gray-100" aria-hidden="true" />
-              )}
-
-              {/* Icon dot */}
+          displayEvents.map((event, idx) => {
+            const isFirst = idx === 0;
+            return (
               <div
-                className={`absolute left-0 top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] border ${
-                  idx === 0 ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
-                }`}
-                aria-hidden="true"
+                key={event.id}
+                className={`flex gap-3 ${isFirst ? 'opacity-100' : 'opacity-60'} hover:opacity-100 transition-opacity duration-300 pb-4 relative`}
               >
-                {getEventIcon(event.type)}
-              </div>
-
-              {/* Content */}
-              <div>
-                <p className="text-sm text-gray-800 leading-snug">{getEventLabel(event)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                </p>
-                {/* Inline contextual message */}
-                {event.data?.error && (
-                  <p className={`text-xs mt-1 px-2 py-1 rounded border ${getEventToneClass(event.type)}`}>
-                    {event.data.error}
+                <div className="mt-1 shrink-0 relative z-10 bg-[var(--color-bg-base)]">
+                  <span className={`inline-block w-2 h-2 rounded-full ${isFirst ? 'bg-[var(--color-accent-primary)] animate-pulse' : 'bg-[var(--color-border-strong)]'}`}></span>
+                </div>
+                {!isFirst && <div className="absolute left-[3px] top-3 bottom-0 w-px bg-[var(--color-border-subtle)] -z-0"></div>}
+                <div className="flex-1 -mt-1">
+                  <p className={`text-sm font-medium ${isFirst ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]'}`}>
+                    {getEventLabel(event)}
                   </p>
-                )}
+                  
+                  {showTechnical && event.type === 'agent_action' && event.data?.action && (
+                    <p className="text-xs font-mono text-[var(--color-text-muted)] mt-1">
+                      {event.data.action}
+                    </p>
+                  )}
+
+                  <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                    {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  
+                  {/* Inline contextual message */}
+                  {event.data?.error && (
+                    <p className={`text-xs mt-2 px-3 py-2 rounded-md border ${getEventToneClass(event.type)}`}>
+                      {event.data.error}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </section>

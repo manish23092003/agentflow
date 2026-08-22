@@ -98,13 +98,25 @@ export class ProcurementService {
       // 5. Success Flow
       const contentHash = crypto.createHash('sha256').update(result.data).digest('hex');
       
+      let parsedTitle = recommendation.service || 'External x402 Resource';
+      let parsedSnippet = result.data?.slice(0, 300) || 'Paid Resource acquired via ProcurementService';
+      try {
+        const parsed = JSON.parse(result.data);
+        if (parsed.title) parsedTitle = parsed.title;
+        if (parsed.summary) parsedSnippet = parsed.summary;
+        else if (parsed.insight) parsedSnippet = parsed.insight;
+        else if (parsed.report) parsedSnippet = typeof parsed.report === 'object' ? JSON.stringify(parsed.report) : String(parsed.report);
+      } catch {
+        // fallback
+      }
+
       await this.researchRepo.addCitation({
         researchSessionId: sessionId,
         url: recommendation.serviceUrl,
-        title: recommendation.service,
-        snippet: 'Paid Resource acquired via ProcurementService',
+        title: parsedTitle,
+        snippet: parsedSnippet,
         sourceType: 'X402_RESOURCE',
-        provider: 'x402-bazaar',
+        provider: 'External x402 Provider',
         isPaid: true,
         cost: requirement.rawAmount,
         purchaseId: result.metadata?.paymentRecordId,
@@ -226,13 +238,25 @@ export class ProcurementService {
 
       const contentHash = crypto.createHash('sha256').update(result.data).digest('hex');
       
+      let parsedTitle = 'External x402 Resource';
+      let parsedSnippet = result.data?.slice(0, 300) || 'Paid Resource acquired via ProcurementService (HITL)';
+      try {
+        const parsed = JSON.parse(result.data);
+        if (parsed.title) parsedTitle = parsed.title;
+        if (parsed.summary) parsedSnippet = parsed.summary;
+        else if (parsed.insight) parsedSnippet = parsed.insight;
+        else if (parsed.report) parsedSnippet = typeof parsed.report === 'object' ? JSON.stringify(parsed.report) : String(parsed.report);
+      } catch {
+        // fallback
+      }
+
       await this.researchRepo.addCitation({
         researchSessionId: sessionId,
         url: approval.resourceUrl,
-        title: 'Paid Resource (Approved)',
-        snippet: 'Paid Resource acquired via ProcurementService (HITL)',
+        title: parsedTitle,
+        snippet: parsedSnippet,
         sourceType: 'X402_RESOURCE',
-        provider: 'x402-bazaar',
+        provider: 'External x402 Provider',
         isPaid: true,
         cost: requirement.rawAmount,
         purchaseId: paymentRecord.id,

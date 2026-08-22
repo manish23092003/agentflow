@@ -3,6 +3,7 @@ import React from 'react';
 interface Citation {
   id: string;
   title: string;
+  snippet?: string;
   url: string;
   provider: string;
   isPaid: boolean;
@@ -21,47 +22,48 @@ export const CitationList: React.FC<CitationListProps> = ({ citations }) => {
 
   if (citations.length === 0) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm mt-4">
-        <h3 className="text-sm font-semibold text-gray-900 mb-2 uppercase tracking-wide">Sources</h3>
-        <p className="text-sm text-gray-500 italic">No sources collected yet.</p>
+      <div className="py-8 border-t border-[var(--color-border-subtle)]">
+        <h3 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-4">Sources</h3>
+        <p className="text-sm text-[var(--color-text-muted)] italic">No sources collected yet.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-4 overflow-hidden">
-      <div className="p-4 border-b border-gray-200 bg-gray-50">
-        <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Sources ({citations.length})</h3>
+    <div className="py-8 border-t border-[var(--color-border-subtle)]">
+      <div className="mb-6">
+        <h3 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">Sources ({citations.length})</h3>
       </div>
-      <div className="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
-        {citations.map(c => (
-          <div key={c.id} className="p-4 hover:bg-gray-50 transition-colors">
-            <div className="flex justify-between items-start mb-1">
+      <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+        {citations.map((c, i) => (
+          <div key={c.id} className="group flex gap-3">
+            <div className="font-mono text-xs text-[var(--color-text-muted)] mt-0.5 shrink-0">
+              [{i + 1}]
+            </div>
+            <div className="flex-1">
               <a 
                 href={c.url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-sm font-medium text-blue-600 hover:underline line-clamp-2"
+                className="text-sm font-medium text-[var(--color-text-primary)] group-hover:text-[var(--color-accent-primary)] transition-colors line-clamp-1 leading-snug"
                 title={c.title}
               >
                 {c.title}
               </a>
-              {c.isPaid && (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 whitespace-nowrap">
-                  Paid
-                </span>
-              )}
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <div className="text-xs text-gray-500 flex items-center space-x-2">
-                <span className="bg-gray-100 px-2 py-0.5 rounded text-gray-600">{c.provider}</span>
-                <span>{new Date(c.retrievedAt).toLocaleTimeString()}</span>
+              <div className="flex items-center gap-3 mt-1 text-[11px] font-mono">
+                <span className="text-[var(--color-text-muted)]">{c.provider}</span>
+                <span className="text-[var(--color-border-strong)]">|</span>
+                <span className="text-[var(--color-text-muted)]">{new Date(c.retrievedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                {c.isPaid && (
+                  <>
+                    <span className="text-[var(--color-border-strong)]">|</span>
+                    <span className="text-[var(--color-accent-primary)] font-semibold">Premium</span>
+                    {c.costBaseUnits && (
+                      <span className="text-[var(--color-text-primary)]">{formatUSDC(c.costBaseUnits)}</span>
+                    )}
+                  </>
+                )}
               </div>
-              {c.isPaid && c.costBaseUnits && (
-                <div className="text-xs font-mono font-medium text-gray-700">
-                  {formatUSDC(c.costBaseUnits)}
-                </div>
-              )}
             </div>
           </div>
         ))}

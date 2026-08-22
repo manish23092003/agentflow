@@ -6,7 +6,7 @@ describe('BazaarServiceDiscoveryProvider', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    provider = new BazaarServiceDiscoveryProvider('https://mock.facilitator', '12345');
+    provider = new BazaarServiceDiscoveryProvider('https://mock.facilitator', '12345', false);
   });
 
   it('should fetch and normalize results from the API', async () => {

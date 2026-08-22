@@ -4,3 +4,4 @@ export * from './Workspace';
 export * from './History';
 export * from './Approvals';
 export * from './Payments';
+export * from './Landing';

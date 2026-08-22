@@ -8,9 +8,16 @@ import { SigningService } from '../security/SigningService.js';
 // Mock the node-fetch globally
 const originalFetch = global.fetch;
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Ensure default test user exists for foreign key constraint
+  await prisma.user.upsert({
+    where: { id: 'test' },
+    create: { id: 'test', email: 'test@agentflow.ai', name: 'Test' },
+    update: {}
+  });
   // Clear the DB before each test
-  return prisma.approvalRequest.deleteMany().then(() => prisma.paymentRecord.deleteMany());
+  await prisma.approvalRequest.deleteMany();
+  await prisma.paymentRecord.deleteMany();
 });
 
 afterEach(() => {

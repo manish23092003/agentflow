@@ -1,6 +1,8 @@
 import React from 'react';
 import { ResearchState } from '../../types/index.js';
-import { CheckCircle2, Circle, Loader2, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ReportAreaProps {
   state: ResearchState;
@@ -63,8 +65,13 @@ const SIMPLE_STEPS: Step[] = [
 const FailedDetail: React.FC<{ failureReason?: string }> = ({ failureReason }) => {
   const [expanded, setExpanded] = React.useState(false);
 
+  const isQuotaError = failureReason?.toLowerCase().includes('quota') || failureReason?.toLowerCase().includes('429');
+
   const friendlyMessage = (): string => {
     if (!failureReason) return 'An unexpected error occurred.';
+    if (isQuotaError) {
+      return 'AI research is temporarily unavailable because the Gemini quota has been reached.';
+    }
     if (failureReason.toLowerCase().includes('no tool call') || failureReason.toLowerCase().includes('llm')) {
       return 'The AI model did not return a usable response.';
     }
@@ -78,22 +85,28 @@ const FailedDetail: React.FC<{ failureReason?: string }> = ({ failureReason }) =
   };
 
   return (
-    <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-      <div className="flex items-start gap-3 mb-4">
-        <XCircle size={22} className="text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
+    <div className="bg-[var(--color-danger-bg)] border border-[var(--color-danger-border)] p-8">
+      <div className="flex items-start gap-4 mb-6">
+        <XCircle size={24} className="text-[var(--color-danger)] shrink-0 mt-0.5" aria-hidden="true" />
         <div>
-          <h3 className="text-base font-semibold text-red-800">Research couldn&apos;t be completed</h3>
-          <p className="text-sm text-red-700 mt-1">{friendlyMessage()}</p>
+          <h3 className="text-xl font-display font-semibold text-[var(--color-danger)] mb-2 uppercase tracking-wide">Research Error</h3>
+          <p className="text-base text-[var(--color-danger)] opacity-90">{friendlyMessage()}</p>
         </div>
       </div>
 
-      <div className="pl-8 space-y-3 text-sm">
-        <div className="bg-white border border-red-100 rounded p-3">
-          <p className="font-medium text-gray-700 mb-1">What you can do</p>
-          <ul className="list-disc list-inside text-gray-600 space-y-1">
-            <li>Try rephrasing your research question</li>
-            <li>Start a new research session with a slightly different topic</li>
-            <li>Check that the API keys are configured correctly if the problem persists</li>
+      <div className="pl-10 space-y-6">
+        <div>
+          <p className="text-sm font-semibold text-[var(--color-danger)] uppercase tracking-widest mb-3 opacity-80">Suggested Actions</p>
+          <ul className="list-disc list-inside text-[var(--color-danger)] opacity-90 space-y-2">
+            {isQuotaError ? (
+              <li>Retry later when the quota resets</li>
+            ) : (
+              <>
+                <li>Try rephrasing your research question</li>
+                <li>Start a new research session with a slightly different topic</li>
+                <li>Check that the API keys are configured correctly if the problem persists</li>
+              </>
+            )}
           </ul>
         </div>
 
@@ -102,14 +115,13 @@ const FailedDetail: React.FC<{ failureReason?: string }> = ({ failureReason }) =
             <button
               type="button"
               onClick={() => setExpanded(e => !e)}
-              className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium"
+              className="text-xs text-[var(--color-danger)] uppercase tracking-widest font-semibold hover:opacity-70 transition-opacity focus:outline-none"
               aria-expanded={expanded}
             >
-              {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              Technical details
+              {expanded ? 'Hide technical details' : 'View technical details'}
             </button>
             {expanded && (
-              <pre className="mt-2 text-xs text-red-700 bg-red-100 p-3 rounded overflow-auto whitespace-pre-wrap break-words">
+              <pre className="mt-4 text-xs text-[var(--color-danger)] bg-black/10 p-4 font-mono overflow-auto whitespace-pre-wrap break-words">
                 {failureReason}
               </pre>
             )}
@@ -127,16 +139,18 @@ export const ReportArea: React.FC<ReportAreaProps> = ({ state, reportContent, fa
 
   if (state === 'COMPLETED' as ResearchState) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm min-h-[200px] p-8">
+      <div className="min-h-[400px] p-2">
         {reportContent ? (
-          <article className="prose prose-gray max-w-none" aria-label="Research report">
-            <div dangerouslySetInnerHTML={{ __html: reportContent }} />
+          <article className="markdown-report" aria-label="Research report">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {reportContent}
+            </ReactMarkdown>
           </article>
         ) : (
-          <div className="text-center py-12">
-            <CheckCircle2 size={40} className="text-green-500 mx-auto mb-3" aria-hidden="true" />
-            <p className="text-xl font-medium text-gray-900">Research Complete</p>
-            <p className="text-gray-500 text-sm mt-2">The report will appear here.</p>
+          <div className="text-center py-24">
+            <CheckCircle2 size={48} className="text-[var(--color-success)] mx-auto mb-6" aria-hidden="true" />
+            <p className="text-2xl font-display font-semibold text-[var(--color-text-primary)]">Research Complete</p>
+            <p className="text-[var(--color-text-secondary)] text-base mt-3">The report will appear here.</p>
           </div>
         )}
       </div>
@@ -149,47 +163,45 @@ export const ReportArea: React.FC<ReportAreaProps> = ({ state, reportContent, fa
   const currentIdx = currentStateIndex(state);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8 min-h-[300px]">
-      <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-6">Progress</h2>
-      <ol className="space-y-4" aria-label="Research progress">
+    <div className="p-2">
+      <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-10">Compilation Progress</h2>
+      <ol className="space-y-6" aria-label="Research progress">
         {steps.map((step) => {
           const stepIdx = STATE_ORDER[step.state] ?? 0;
           const isCurrent = step.state === state;
           const isDone = stepIdx < currentIdx && !isCurrent;
 
-
           return (
-            <li key={step.state} className="flex items-center gap-3">
-              {isDone ? (
-                <CheckCircle2 size={20} className="text-green-500 shrink-0" aria-label="Complete" />
-              ) : isCurrent ? (
-                <Loader2 size={20} className="text-blue-500 shrink-0 animate-spin" aria-label="In progress" />
-              ) : (
-                <Circle size={20} className="text-gray-300 shrink-0" aria-label="Pending" />
-              )}
+            <li key={step.state} className={`flex items-center gap-6 ${!isDone && !isCurrent ? 'opacity-40' : ''}`}>
+              <div className="shrink-0 font-mono text-sm w-6 text-center">
+                {isDone ? (
+                  <span className="text-[var(--color-text-muted)]">✓</span>
+                ) : isCurrent ? (
+                  <Loader2 size={16} className="text-[var(--color-accent-primary)] animate-spin inline" aria-label="In progress" />
+                ) : (
+                  <span className="text-[var(--color-text-muted)]">-</span>
+                )}
+              </div>
               <span
-                className={`text-sm ${
-                  isDone ? 'text-gray-500 line-through-none' :
-                  isCurrent ? 'text-gray-900 font-medium' :
-                  'text-gray-400'
+                className={`text-lg font-medium tracking-wide ${
+                  isCurrent ? 'text-[var(--color-accent-primary)]' : 'text-[var(--color-text-primary)]'
                 }`}
               >
                 {step.label}
               </span>
-              {isCurrent && (
-                <span className="ml-auto text-xs text-blue-500 font-medium animate-pulse">Now</span>
-              )}
             </li>
           );
         })}
         {/* Final step always shown */}
-        <li className="flex items-center gap-3">
-          {(state as string) === 'COMPLETED' ? (
-            <CheckCircle2 size={20} className="text-green-500 shrink-0" />
-          ) : (
-            <Circle size={20} className="text-gray-300 shrink-0" />
-          )}
-          <span className={`text-sm ${(state as string) === 'COMPLETED' ? 'text-gray-500' : 'text-gray-400'}`}>
+        <li className={`flex items-center gap-6 ${(state as string) === 'COMPLETED' ? '' : 'opacity-40'}`}>
+          <div className="shrink-0 font-mono text-sm w-6 text-center">
+             {(state as string) === 'COMPLETED' ? (
+                <span className="text-[var(--color-text-muted)]">✓</span>
+              ) : (
+                <span className="text-[var(--color-text-muted)]">-</span>
+              )}
+          </div>
+          <span className="text-lg font-medium tracking-wide text-[var(--color-text-primary)]">
             Report ready
           </span>
         </li>

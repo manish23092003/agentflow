@@ -16,24 +16,26 @@ export const ProcurementContext: React.FC<ProcurementContextProps> = ({ event })
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm mt-4">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">Procurement Context</h3>
-      <div className="space-y-3">
+    <div className="py-8 border-t border-[var(--color-border-subtle)]">
+      <h3 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-6">Procurement Context</h3>
+      <div className="space-y-6">
         <div>
-          <span className="text-xs text-gray-500 uppercase">Service</span>
-          <p className="text-sm font-medium text-gray-900">{data.serviceName || 'Unknown Service'}</p>
+          <span className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5 block">Service</span>
+          <p className="text-base text-[var(--color-text-primary)]">{data.serviceName || 'Unknown Service'}</p>
         </div>
         <div>
-          <span className="text-xs text-gray-500 uppercase">Price</span>
-          <p className="text-sm font-mono font-medium text-gray-900">{formatUSDC(data.price)}</p>
+          <span className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5 block">Price</span>
+          <p className="text-base font-mono text-[var(--color-text-primary)]">{formatUSDC(data.price)}</p>
         </div>
         <div>
-          <span className="text-xs text-gray-500 uppercase">Expected Value</span>
-          <p className="text-sm text-gray-900">{data.expectedValue || 'Not specified'}</p>
+          <span className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5 block">Expected Value</span>
+          <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">{data.expectedValue || 'Not specified'}</p>
         </div>
         <div>
-          <span className="text-xs text-gray-500 uppercase">Reason for Paid</span>
-          <p className="text-sm text-gray-900 italic">{data.reason || 'Not specified'}</p>
+          <span className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-1.5 block">Reason for Paid</span>
+          <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed italic border-l-2 border-[var(--color-border-strong)] pl-3">
+            {data.reason || 'Not specified'}
+          </p>
         </div>
       </div>
     </div>

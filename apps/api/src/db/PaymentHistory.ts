@@ -18,6 +18,8 @@ export interface PaymentRecord {
   status: PaymentStatus;
   agentAction: string;
   researchSessionId?: string;
+  userId?: string;
+  payerAddress?: string;
 }
 
 export interface ApprovalRequest {
@@ -40,7 +42,7 @@ export interface ApprovalRequest {
 
 export interface PaymentRepository {
   createPayment(record: Omit<PaymentRecord, 'id' | 'timestamp'>): Promise<PaymentRecord>;
-  getPayments(): Promise<PaymentRecord[]>;
+  getPayments(userId?: string): Promise<PaymentRecord[]>;
   getPaymentById(id: string): Promise<PaymentRecord | null>;
   updateStatus(id: string, updates: Partial<Pick<PaymentRecord, 'status' | 'transactionId'>>): Promise<void>;
   updatePayment(id: string, updates: Partial<PaymentRecord>): Promise<void>;
@@ -138,7 +140,9 @@ export class PrismaPaymentRepository implements PaymentRepository {
         status: record.status,
         agentAction: record.agentAction,
         transactionId: record.transactionId,
-        researchSessionId: record.researchSessionId
+        researchSessionId: record.researchSessionId,
+        userId: record.userId,
+        payerAddress: record.payerAddress
       }
     });
 
@@ -154,12 +158,17 @@ export class PrismaPaymentRepository implements PaymentRepository {
       status: dbRecord.status as PaymentStatus,
       agentAction: dbRecord.agentAction,
       transactionId: dbRecord.transactionId ?? undefined,
-      researchSessionId: dbRecord.researchSessionId ?? undefined
+      researchSessionId: dbRecord.researchSessionId ?? undefined,
+      userId: dbRecord.userId ?? undefined,
+      payerAddress: dbRecord.payerAddress ?? undefined
     };
   }
 
-  async getPayments(): Promise<PaymentRecord[]> {
-    const dbRecords = await prisma.paymentRecord.findMany();
+  async getPayments(userId?: string): Promise<PaymentRecord[]> {
+    const dbRecords = await prisma.paymentRecord.findMany({
+      where: userId ? { userId } : undefined,
+      orderBy: { createdAt: 'desc' }
+    });
     return dbRecords.map(dbRecord => ({
       id: dbRecord.id,
       timestamp: dbRecord.createdAt.toISOString(),
@@ -172,7 +181,9 @@ export class PrismaPaymentRepository implements PaymentRepository {
       status: dbRecord.status as PaymentStatus,
       agentAction: dbRecord.agentAction,
       transactionId: dbRecord.transactionId ?? undefined,
-      researchSessionId: dbRecord.researchSessionId ?? undefined
+      researchSessionId: dbRecord.researchSessionId ?? undefined,
+      userId: dbRecord.userId ?? undefined,
+      payerAddress: dbRecord.payerAddress ?? undefined
     }));
   }
 
@@ -191,7 +202,9 @@ export class PrismaPaymentRepository implements PaymentRepository {
       status: dbRecord.status as PaymentStatus,
       agentAction: dbRecord.agentAction,
       transactionId: dbRecord.transactionId ?? undefined,
-      researchSessionId: dbRecord.researchSessionId ?? undefined
+      researchSessionId: dbRecord.researchSessionId ?? undefined,
+      userId: dbRecord.userId ?? undefined,
+      payerAddress: dbRecord.payerAddress ?? undefined
     };
   }
 
@@ -205,7 +218,9 @@ export class PrismaPaymentRepository implements PaymentRepository {
       data: {
         status: updates.status,
         transactionId: updates.transactionId,
-        researchSessionId: updates.researchSessionId
+        researchSessionId: updates.researchSessionId,
+        ...(updates.userId && { userId: updates.userId }),
+        ...(updates.payerAddress && { payerAddress: updates.payerAddress })
       }
     });
   }

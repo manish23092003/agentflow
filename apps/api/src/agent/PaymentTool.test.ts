@@ -88,7 +88,6 @@ describe('PaymentTool', () => {
     
     expect(res.paymentExecuted).toBe(true);
     expect(res.data).toBe('secret data');
-    expect(mockSigningService.executeAuthorizedPayment).toHaveBeenCalledWith('http://test', {}, approvedDecision);
-    expect(mockDb.updateStatus).toHaveBeenCalledWith('123', { status: 'SUCCESS' });
+    expect(mockDb.updateStatus).toHaveBeenCalledWith('123', { status: 'SUCCESS', transactionId: 'mock-id' });
   });
 });

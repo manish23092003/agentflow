@@ -67,6 +67,49 @@ export function readPaymentRequired(response: Response): PaymentRequiredSummary 
   }
 }
 
+export interface PaymentResponseSummary {
+  success: boolean;
+  payer?: string;
+  transactionId?: string;
+  network?: string;
+}
+
+export function readPaymentResponse(response: Response): PaymentResponseSummary | null {
+  const directId = response.headers.get('payment-identifier') || response.headers.get('x-payment-identifier');
+  const encoded = response.headers.get('payment-response') || response.headers.get('x-payment-response');
+  
+  let txId = directId || undefined;
+  let payer: string | undefined;
+  let network: string | undefined;
+  let success = response.ok;
+
+  if (encoded) {
+    try {
+      const parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as {
+        success?: boolean;
+        payer?: string;
+        transaction?: string;
+        txId?: string;
+        network?: string;
+      };
+      if (parsed.success !== undefined) success = parsed.success;
+      if (parsed.transaction) txId = parsed.transaction;
+      else if (parsed.txId) txId = parsed.txId;
+      if (parsed.payer) payer = parsed.payer;
+      if (parsed.network) network = parsed.network;
+    } catch {
+      // ignore
+    }
+  }
+
+  return {
+    success,
+    payer,
+    transactionId: txId,
+    network,
+  };
+}
+
 export function explainPaymentError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();

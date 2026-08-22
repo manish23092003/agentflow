@@ -15,15 +15,23 @@ export class WebSearchTool {
     return createCompatibleTool({
       description: 'Search the web for free information and news. Prioritize this tool before recommending paid services.',
       parameters: z.object({
-        query: z.string().describe('The search query to look up')
+        query: z.string().optional().describe('The search query to look up'),
+        topic: z.string().optional().describe('The topic to search for'),
+        searchQuery: z.string().optional().describe('The search query')
       }),
-      execute: async ({ query }: { query: string }) => {
-        console.log(`[WebSearchTool] execute() called with query: "${query}"`);
+      execute: async (rawArgs: { query?: string; topic?: string; searchQuery?: string }) => {
         const session = await this.repository.getSession(researchSessionId);
         if (!session) {
           console.error('[WebSearchTool] session not found');
           return { error: 'Research session not found' };
         }
+
+        const query = (rawArgs?.query && rawArgs.query !== 'undefined' ? rawArgs.query : null) ||
+                      (rawArgs?.topic && rawArgs.topic !== 'undefined' ? rawArgs.topic : null) ||
+                      (rawArgs?.searchQuery && rawArgs.searchQuery !== 'undefined' ? rawArgs.searchQuery : null) ||
+                      session.goal;
+
+        console.log(`[WebSearchTool] execute() called with query: "${query}"`);
 
         if (!ResearchStateMachine.isToolAllowed(session.status as ResearchState, 'WebSearchTool')) {
           console.error(`[WebSearchTool] not allowed in state: ${session.status}`);

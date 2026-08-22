@@ -23,7 +23,7 @@ export class ResearchStateMachine {
     [ResearchState.RESEARCHING_FREE]: [ResearchState.FREE_RESEARCH_COMPLETE, ResearchState.FAILED],
     [ResearchState.FREE_RESEARCH_COMPLETE]: [ResearchState.EVALUATING_GAPS, ResearchState.FAILED],
     [ResearchState.EVALUATING_GAPS]: [ResearchState.SYNTHESIZING, ResearchState.PAID_DISCOVERY, ResearchState.FAILED],
-    [ResearchState.PAID_DISCOVERY]: [ResearchState.SERVICE_EVALUATION, ResearchState.FAILED],
+    [ResearchState.PAID_DISCOVERY]: [ResearchState.SERVICE_EVALUATION, ResearchState.SYNTHESIZING, ResearchState.FAILED],
     [ResearchState.SERVICE_EVALUATION]: [
       ResearchState.PENDING_APPROVAL,
       ResearchState.PAYMENT_AUTHORIZED,
@@ -31,10 +31,16 @@ export class ResearchStateMachine {
       ResearchState.SYNTHESIZING,
       ResearchState.FAILED
     ],
-    [ResearchState.PENDING_APPROVAL]: [ResearchState.PAYMENT_AUTHORIZED, ResearchState.USER_REJECTED, ResearchState.FAILED],
+    [ResearchState.PENDING_APPROVAL]: [
+      ResearchState.PAYMENT_AUTHORIZED,
+      ResearchState.RESOURCE_ACQUIRED,
+      ResearchState.ALTERNATIVE_DISCOVERY,
+      ResearchState.USER_REJECTED,
+      ResearchState.FAILED
+    ],
     [ResearchState.USER_REJECTED]: [ResearchState.ALTERNATIVE_DISCOVERY, ResearchState.FAILED],
-    [ResearchState.ALTERNATIVE_DISCOVERY]: [ResearchState.SERVICE_EVALUATION, ResearchState.FAILED],
-    [ResearchState.PAYMENT_AUTHORIZED]: [ResearchState.PAYING, ResearchState.FAILED],
+    [ResearchState.ALTERNATIVE_DISCOVERY]: [ResearchState.SERVICE_EVALUATION, ResearchState.SYNTHESIZING, ResearchState.FAILED],
+    [ResearchState.PAYMENT_AUTHORIZED]: [ResearchState.PAYING, ResearchState.RESOURCE_ACQUIRED, ResearchState.SYNTHESIZING, ResearchState.FAILED],
     [ResearchState.PAYING]: [ResearchState.RESOURCE_ACQUIRED, ResearchState.FAILED],
     [ResearchState.RESOURCE_ACQUIRED]: [ResearchState.SYNTHESIZING, ResearchState.FAILED],
     [ResearchState.SYNTHESIZING]: [ResearchState.COMPLETED, ResearchState.FAILED],

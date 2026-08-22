@@ -1,52 +1,96 @@
 import React from 'react';
 import { PaymentRecord } from '../../types/research';
-import { PaymentStatusBadge } from './PaymentStatusBadge';
 import { formatBaseUnits } from '../../utils/currency';
 import { getExplorerTxUrl } from '../../utils/explorer';
+import { ExternalLink } from 'lucide-react';
+import { StatusPill } from '../ui/StatusPill';
 
 interface PaymentRowProps {
   payment: PaymentRecord;
 }
 
 export const PaymentRow: React.FC<PaymentRowProps> = ({ payment }) => {
-  const explorerLink = payment.transactionId && payment.network.toLowerCase().includes('testnet')
+  const isTestnet = payment.network.toLowerCase().includes('testnet') || payment.network.includes('SGO1GKSz');
+  const explorerLink = payment.transactionId && isTestnet
     ? getExplorerTxUrl(payment.transactionId)
     : undefined;
 
-  // Use timestamp if present, otherwise fallback to createdAt
   const dateStr = payment.timestamp || payment.createdAt;
   const date = dateStr ? new Date(dateStr) : new Date();
 
   return (
-    <tr className="hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0">
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {date.toLocaleString()}
+    <tr style={{ borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s ease' }} 
+        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-raised)'}
+        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+    >
+      <td style={{ padding: '16px 24px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-3)' }}>
+        {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium truncate max-w-xs" title={payment.resource || payment.receiver}>
+      <td style={{ padding: '16px 24px', fontSize: 14, color: 'var(--text-1)', maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={payment.resource || payment.receiver}>
         {payment.resource || payment.receiver}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+      <td style={{ padding: '16px 24px', fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text-0)', fontWeight: 500 }}>
         {formatBaseUnits(payment.amount, payment.asset)}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <PaymentStatusBadge status={payment.status} />
+      <td style={{ padding: '16px 24px' }}>
+        <StatusPill status={payment.status} />
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+      <td style={{ padding: '16px 24px', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text-3)' }}>
         {payment.transactionId ? (
           explorerLink ? (
-            <a href={explorerLink} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800 hover:underline flex items-center">
-              <span className="truncate max-w-[120px] inline-block">{payment.transactionId}</span>
-              <svg className="ml-1 w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
+            <a href={explorerLink} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }} title={payment.transactionId}>
+              <span style={{ maxWidth: 120, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }}>{payment.transactionId}</span>
+              <ExternalLink size={12} />
             </a>
           ) : (
-            <span className="truncate max-w-[120px] inline-block" title={payment.transactionId}>{payment.transactionId}</span>
+            <span style={{ maxWidth: 120, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }} title={payment.transactionId}>{payment.transactionId}</span>
           )
         ) : (
-          <span className="text-gray-400 italic">Pending...</span>
+          <span style={{ fontStyle: 'italic', fontFamily: 'var(--font-serif)', color: 'var(--text-4)' }}>Pending...</span>
         )}
       </td>
     </tr>
+  );
+};
+
+export const CompactPaymentRow: React.FC<PaymentRowProps> = ({ payment }) => {
+  const isTestnet = payment.network.toLowerCase().includes('testnet') || payment.network.includes('SGO1GKSz');
+  const explorerLink = payment.transactionId && isTestnet
+    ? getExplorerTxUrl(payment.transactionId)
+    : undefined;
+
+  const dateStr = payment.timestamp || payment.createdAt;
+  const date = dateStr ? new Date(dateStr) : new Date();
+  
+  return (
+    <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border-soft)', transition: 'background 0.15s ease' }}
+         onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-raised)'}
+         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <span style={{ fontSize: 14, color: 'var(--text-1)', maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={payment.resource || payment.receiver}>
+          {payment.resource || payment.receiver}
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--text-0)', fontWeight: 500 }}>
+          {formatBaseUnits(payment.amount, payment.asset)}
+        </span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <StatusPill status={payment.status} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-4)' }}>{date.toLocaleDateString()}</span>
+        </div>
+        {payment.transactionId && (
+          explorerLink ? (
+            <a href={explorerLink} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-mono)', fontSize: 12 }} title={payment.transactionId}>
+              <span style={{ maxWidth: 100, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{payment.transactionId}</span>
+              <ExternalLink size={12} />
+            </a>
+          ) : (
+            <span style={{ color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontSize: 12, maxWidth: 100, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={payment.transactionId}>{payment.transactionId}</span>
+          )
+        )}
+      </div>
+    </div>
   );
 };

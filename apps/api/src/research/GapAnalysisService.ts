@@ -4,14 +4,15 @@ import { GeminiProvider } from '../llm/gemini.js';
 import { config } from '../config.js';
 import type { ResearchRepository } from '../db/ResearchRepository.js';
 import { ResearchStateMachine, ResearchState } from '../agent/ResearchStateMachine.js';
+import { parseLlmError } from '../agent/errors.js';
 import { researchEvents } from './ResearchEventService.js';
 
 export const GapAnalysisSchema = z.object({
-  hasMaterialGap: z.boolean().describe("True if critical info is missing from the evidence."),
-  missingInformation: z.array(z.string()).describe("List of missing key facts."),
+  hasMaterialGap: z.boolean().describe("True if the user's research goal explicitly requests machine-readable data, structured API data, quantitative datasets, proprietary intelligence, or granular forecasts that are not provided as authoritative structured data by the free snippets."),
+  missingInformation: z.array(z.string()).describe("List of missing structured API data fields, quantitative datasets, granular forecasts, or proprietary intelligence."),
   importance: z.enum(['LOW', 'MEDIUM', 'HIGH']).describe("Importance of the missing info."),
   evidenceSummary: z.string().describe("A brief summary of what current evidence supports."),
-  recommendedAction: z.enum(['CONTINUE_FREE', 'DISCOVER_PAID']).describe("Next action recommendation."),
+  recommendedAction: z.enum(['CONTINUE_FREE', 'DISCOVER_PAID']).describe("Next action recommendation. Set to DISCOVER_PAID if budget is available and explicit requirements (such as machine-readable data, structured API responses, proprietary intelligence, or quantitative datasets) are not fully satisfied by free public sources."),
   evidenceCitationIds: z.array(z.string()).describe("List of citation IDs that support the summary.")
 });
 
@@ -45,10 +46,21 @@ export class GapAnalysisService {
 
     const citationText = citations.map(c => `[ID: ${c.id}] Title: ${c.title || 'N/A'}\nSnippet: ${c.snippet || 'N/A'}`).join('\n\n');
 
-    const systemPrompt = `You are a strict research gap analyzer. 
-Your job is to read the user's research goal and the provided evidence citations, and determine if there is a MATERIAL GAP in information.
-Only cite evidence using the provided Citation IDs. Do not invent citation IDs.
-A material gap means quantitative data or critical facts are missing to fully answer the goal.`;
+    const systemPrompt = `You are a rigorous, objective research gap analyzer for AgentFlow.
+Your objective is to determine if the collected free public web search results leave a MATERIAL GAP compared to the user's explicit research goal.
+
+EVALUATION CRITERIA:
+1. Distinguish between public web search snippets and dedicated, authoritative machine-readable API payloads:
+   - Web search engine snippets (from Tavily, Google, etc.) are third-party text/HTML excerpts scraped from public websites. They do NOT constitute an authoritative, verifiable, direct API payload or complete machine-readable service stream.
+   - If the user's goal explicitly asks for machine-readable weather API data, structured short-term forecasts, quantitative datasets, or proprietary market intelligence:
+     * Free web snippets containing partial text or scraped HTML excerpts do NOT satisfy the requirement for authoritative structured API data and complete forecast models.
+     * Truncated JSON snippets in web search previews lack complete multi-hour/multi-day forecast arrays, authenticated API provenance, and verifiable data service outputs.
+   - Therefore, when the user has allocated a research budget and explicitly requested machine-readable API data, structured forecast datasets, or proprietary intelligence:
+     * hasMaterialGap = true
+     * importance = "HIGH"
+     * recommendedAction = "DISCOVER_PAID"
+     * missingInformation = list of specific missing structured API fields / forecast datasets (e.g. ["Authoritative structured API weather data service stream", "Complete structured short-term forecast array"]).
+2. Only when the research goal is general informational lookups that do NOT request structured API data, proprietary datasets, or granular forecasts should hasMaterialGap be false.`;
 
     const llmProvider = new GeminiProvider(config.geminiApiKey, config.geminiModel);
     const model = llmProvider.getModel();
@@ -58,8 +70,22 @@ A material gap means quantitative data or critical facts are missing to fully an
         model,
         schema: GapAnalysisSchema,
         system: systemPrompt,
+        maxRetries: 3,
         messages: [
-          { role: 'user', content: `Goal: "${session.goal}"\n\nEvidence Citations:\n${citationText}\n\nEvaluate the gap.` }
+          {
+            role: 'user',
+            content: `User Research Goal: "${session.goal}"
+Budget Allocated: ${session.researchBudget > 0 ? `${(session.researchBudget / 1000000).toFixed(2)} USDC available for premium research` : 'None'}
+
+Evidence Citations Collected so Far:
+${citationText}
+
+Evaluate whether the collected free public search snippets fully satisfy all explicit requirements in "${session.goal}".
+Specifically verify:
+1. Does the evidence provide an authoritative, direct machine-readable API data payload, or merely third-party scraped web search snippets?
+2. Is the requested structured short-term forecast array present in the free search results?
+If explicit machine-readable API or structured forecast requirements remain unmet by free sources, report hasMaterialGap: true, importance: "HIGH", and recommendedAction: "DISCOVER_PAID".`
+          }
         ]
       });
 
@@ -101,13 +127,16 @@ A material gap means quantitative data or critical facts are missing to fully an
       await ResearchStateMachine.transition(this.repository, sessionId, ResearchState.EVALUATING_GAPS, nextState);
 
     } catch (error) {
+      const llmError = parseLlmError(error);
       await ResearchStateMachine.transition(
         this.repository,
         sessionId,
         ResearchState.EVALUATING_GAPS,
-        ResearchState.FAILED
+        ResearchState.FAILED,
+        llmError.message
       );
-      throw error;
+      researchEvents.emitResearchFailed(sessionId, llmError.message);
+      throw llmError;
     }
   }
 }

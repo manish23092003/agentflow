@@ -1,12 +1,14 @@
 import React from 'react';
 import { api } from '../../lib/api';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Wallet, ExternalLink, ShieldCheck } from 'lucide-react';
+import { useWallet } from '../../context/WalletContext';
 
 export type ApprovalState = 'PENDING' | 'APPROVING' | 'REJECTING' | 'APPROVED' | 'REJECTED' | 'STALE' | 'FAILED';
 
 interface ApprovalActionsProps {
   approvalId: string;
   currentState: ApprovalState;
+  costDisplay?: string;
   onStateChange: (state: ApprovalState) => void;
   onError: (error: string) => void;
 }
@@ -14,18 +16,29 @@ interface ApprovalActionsProps {
 export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
   approvalId,
   currentState,
+  costDisplay,
   onStateChange,
   onError
 }) => {
+  const [transactionId, setTransactionId] = React.useState<string | null>(null);
+  const { isConnected, shortAddress } = useWallet();
   const isPending = currentState === 'PENDING';
   const isWorking = currentState === 'APPROVING' || currentState === 'REJECTING';
 
   const handleApprove = async () => {
     if (!isPending) return;
+    if (!isConnected) {
+      onError('Please connect your Pera Wallet before approving payment.');
+      return;
+    }
+
     onStateChange('APPROVING');
     try {
       const res = await api.approve(approvalId);
       if (res.status === 'SUCCESS') {
+        if (res.payload?.transactionId) {
+          setTransactionId(res.payload.transactionId);
+        }
         onStateChange('APPROVED');
       } else {
         onStateChange('FAILED');
@@ -35,7 +48,7 @@ export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes('expired') || message.includes('stale')) {
         onStateChange('STALE');
-        onError('This approval request has expired. The agent will look for an alternative source.');
+        onError('This request has expired. The agent will automatically look for an alternative source.');
       } else {
         onStateChange('FAILED');
         onError('Something went wrong while processing the approval. Please try again.');
@@ -69,17 +82,42 @@ export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
   // Post-action confirmation states
   if (currentState === 'APPROVED') {
     return (
-      <div className="mt-4 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 font-medium">
-        <span>✓</span>
-        <span>Purchase approved — the agent is continuing your research.</span>
+      <div className="space-y-3 p-4 bg-[var(--color-bg-base)] border border-[var(--color-border-subtle)] rounded">
+        <div className="flex items-center gap-2 text-[var(--color-success)] font-medium text-base">
+          <ShieldCheck size={18} />
+          <span>Purchase approved — the agent is continuing your research.</span>
+        </div>
+        <div className="text-xs text-[var(--color-text-secondary)] space-y-1.5 font-mono pt-1">
+          <div>Amount: <span className="text-[var(--color-text-primary)] font-bold">{costDisplay || '0.001 USDC'}</span></div>
+          <div>Network: Algorand TestNet</div>
+          {transactionId && (
+            <div className="flex flex-col gap-1 pt-1">
+              <div>
+                <span className="text-[var(--color-text-muted)]">Transaction ID: </span>
+                <span className="text-[var(--color-text-primary)] font-semibold break-all">{transactionId}</span>
+              </div>
+              <div>
+                <a
+                  href={`https://testnet.explorer.perawallet.app/tx/${transactionId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[var(--color-accent-primary)] hover:underline"
+                >
+                  <ExternalLink size={12} />
+                  View on Pera Algorand Explorer
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
   if (currentState === 'REJECTED') {
     return (
-      <div className="mt-4 flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
-        <span>✕</span>
+      <div className="flex items-center gap-4 text-[var(--color-text-secondary)]">
+        <span className="font-mono text-base">✕</span>
         <span>Purchase declined — the agent will use the sources it already has.</span>
       </div>
     );
@@ -87,56 +125,57 @@ export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
 
   if (currentState === 'STALE') {
     return (
-      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-        This request has expired. The agent will automatically look for an alternative source.
+      <div className="flex items-center gap-4 text-[var(--color-text-muted)]">
+        <span className="font-mono">⚠</span>
+        <span>This request has expired. The agent will automatically look for an alternative source.</span>
       </div>
     );
   }
 
-  if (currentState === 'FAILED') {
-    return (
-      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-        Something went wrong. Please refresh the page and try again.
-      </div>
-    );
-  }
-
-  // Default: PENDING / APPROVING / REJECTING
   return (
-    <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
-      <button
-        id="approval-reject-btn"
-        type="button"
-        onClick={handleReject}
-        disabled={!isPending || isWorking}
-        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
-        {currentState === 'REJECTING' ? (
-          <span className="flex items-center gap-2">
-            <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-            Declining…
-          </span>
-        ) : (
-          'Reject & Continue Without It'
-        )}
-      </button>
-
-      <button
-        id="approval-approve-btn"
-        type="button"
-        onClick={handleApprove}
-        disabled={!isPending || isWorking}
-        className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-      >
-        {currentState === 'APPROVING' ? (
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+      <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+        {isConnected ? (
           <>
-            <Loader2 size={14} className="animate-spin" aria-hidden="true" />
-            Approving…
+            <span>Authorizing from:</span>
+            <span className="font-mono text-[var(--color-text-primary)] font-semibold">{shortAddress}</span>
           </>
         ) : (
-          'Approve Purchase'
+          <div className="flex items-center gap-2 text-[var(--color-warning)]">
+            <Wallet size={13} />
+            <span>Wallet not connected</span>
+          </div>
         )}
-      </button>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          id="approval-reject-btn"
+          onClick={handleReject}
+          disabled={isWorking}
+          className="px-4 py-2 border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-strong)] rounded text-xs uppercase tracking-wider font-semibold transition-colors disabled:opacity-50"
+        >
+          {currentState === 'REJECTING' ? 'Rejecting...' : 'Reject'}
+        </button>
+
+        <button
+          type="button"
+          id="approval-approve-btn"
+          onClick={handleApprove}
+          disabled={isWorking}
+          className="px-5 py-2 bg-[var(--accent)] text-[#14130f] rounded text-xs uppercase tracking-wider font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+        >
+          {currentState === 'APPROVING' ? (
+            <>
+              <Loader2 size={13} className="animate-spin" />
+              Processing Payment...
+            </>
+          ) : (
+            `Approve ${costDisplay || '0.10 USDC'}`
+          )}
+        </button>
+      </div>
     </div>
   );
 };

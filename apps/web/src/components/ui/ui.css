@@ -24,10 +24,14 @@
 
 /* Variants */
 .ui-btn-primary {
-  background-color: var(--color-accent-primary);
-  color: var(--color-accent-primary-text);
+  background-color: var(--color-text-primary);
+  color: var(--color-bg-base);
 }
-.ui-btn-primary:hover:not(:disabled) { background-color: var(--color-accent-primary-hover); }
+.ui-btn-primary:hover:not(:disabled) { 
+  background-color: var(--color-bg-surface-hover); 
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+}
 
 .ui-btn-secondary {
   background-color: var(--color-bg-surface-hover);

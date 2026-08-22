@@ -17,22 +17,29 @@ export class ResearchRepository {
     });
   }
 
-  async getSession(id: string): Promise<ResearchSession | null> {
-    return this.db.researchSession.findUnique({
-      where: { id }
+  async getSession(id: string, userId?: string): Promise<ResearchSession | null> {
+    return this.db.researchSession.findFirst({
+      where: {
+        id,
+        ...(userId && { userId })
+      }
     });
   }
 
-  async getSessions(): Promise<ResearchSession[]> {
+  async getSessions(userId?: string): Promise<ResearchSession[]> {
     return this.db.researchSession.findMany({
+      where: userId ? { userId } : undefined,
       orderBy: { createdAt: 'desc' }
     });
   }
 
-  async updateStatus(id: string, status: ResearchState): Promise<ResearchSession> {
+  async updateStatus(id: string, status: ResearchState, failureReason?: string): Promise<ResearchSession> {
     return this.db.researchSession.update({
       where: { id },
-      data: { status }
+      data: { 
+        status,
+        ...(failureReason && { failureReason })
+      }
     });
   }
 
@@ -42,6 +49,16 @@ export class ResearchRepository {
       data: {
         spent: { increment: amount }
       }
+    });
+  }
+
+  async updateReport(id: string, report: string): Promise<ResearchSession> {
+    if (!report || report.trim().length === 0) {
+      throw new Error('Report must be a non-empty string');
+    }
+    return this.db.researchSession.update({
+      where: { id },
+      data: { report }
     });
   }
 

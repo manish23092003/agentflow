@@ -1,49 +1,25 @@
 import React from 'react';
-import { ReportHeader } from './ReportHeader';
-import { ExecutiveSummary } from './ExecutiveSummary';
-import { KeyFindings } from './KeyFindings';
-import { ResearchLimitations } from './ResearchLimitations';
 import { ResearchSession } from '../../types/research';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface FinalReportProps {
   session: ResearchSession;
 }
 
 export const FinalReport: React.FC<FinalReportProps> = ({ session }) => {
-  // Extract potential structured data if backend placed it in session.report
-  // The backend might send stringified JSON or just plain text.
-  // We parse it safely if it's JSON, or use fallback if missing.
-  let executiveSummary: string | undefined;
-  let keyFindings: string[] | undefined;
-  let limitations: string[] | undefined;
-
-  if (session.report) {
-    try {
-      const parsed = JSON.parse(session.report);
-      executiveSummary = parsed.executiveSummary;
-      keyFindings = parsed.keyFindings;
-      limitations = parsed.limitations;
-    } catch {
-      // If it's not JSON, it might just be markdown text.
-      // In that case we just render it as Executive Summary.
-      executiveSummary = session.report;
-    }
-  }
-
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8 lg:p-10 min-h-[500px]">
-      <ReportHeader session={session} />
-      
-      <div className="max-w-4xl">
-        <ExecutiveSummary content={executiveSummary} />
-        
-        <KeyFindings findings={keyFindings} />
-        
-        <ResearchLimitations 
-          limitations={limitations} 
-          failureReason={session.failureReason} 
-        />
+    <div className="py-8 lg:py-12 pr-4 min-h-[500px]">
+      <div className="mb-16 border-b border-[var(--color-border-subtle)] pb-12">
+        <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-widest mb-6">Final Output</h2>
+        <h1 className="text-4xl lg:text-5xl font-display font-semibold text-[var(--color-text-primary)] leading-tight mb-4">{session.goal}</h1>
       </div>
+      
+      <article className="markdown-report" aria-label="Research report">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {session.report || '*No report content available.*'}
+        </ReactMarkdown>
+      </article>
     </div>
   );
 };

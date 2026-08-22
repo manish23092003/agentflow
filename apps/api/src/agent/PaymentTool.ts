@@ -1,4 +1,4 @@
-import { readPaymentRequired } from '@agentflow/x402-client';
+import { readPaymentRequired, readPaymentResponse } from '@agentflow/x402-client';
 import type { PaymentRepository } from '../db/PaymentHistory.js';
 import type { PolicyEngine } from './PolicyEngine.js';
 import type { UserSpendingPolicy } from './types.js';
@@ -142,11 +142,12 @@ export class PaymentTool {
         throw new Error(`Paid request failed with HTTP ${paidResponse.status}`);
       }
 
-      await this.db.updateStatus(record.id, { status: 'SUCCESS' });
-      
-      const paymentIdentifier = paidResponse.headers.get('payment-identifier') || paidResponse.headers.get('x-payment-identifier');
+      const paymentResp = readPaymentResponse(paidResponse);
+      const transactionId = paymentResp?.transactionId || paidResponse.headers.get('payment-identifier') || paidResponse.headers.get('x-payment-identifier') || undefined;
       const settle = paidResponse.headers.get('payment-settle') || paidResponse.headers.get('x-payment-settle');
-      logs.push(`[Agent] Payment successful. Resource unlocked. Tx/Settle: ${paymentIdentifier} | ${settle}`);
+      logs.push(`[Agent] Payment successful. Resource unlocked. Tx: ${transactionId} | Settle: ${settle}`);
+
+      await this.db.updateStatus(record.id, { status: 'SUCCESS', transactionId });
 
       return {
         data: await paidResponse.text(),
@@ -156,7 +157,7 @@ export class PaymentTool {
           amount: requirement.rawAmount.toString(),
           asset: requirement.asset,
           network: requirement.network,
-          transactionId: paymentIdentifier || undefined,
+          transactionId,
           paymentRecordId: record.id
         }
       };
