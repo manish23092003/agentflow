@@ -34,6 +34,8 @@ export interface PaymentRequiredSummary {
   asset: string;
   description: string;
   rawAmount: number;
+  payTo?: string;
+  scheme?: string;
 }
 
 export function readPaymentRequired(response: Response): PaymentRequiredSummary | null {
@@ -47,6 +49,8 @@ export function readPaymentRequired(response: Response): PaymentRequiredSummary 
         amount?: string;
         network?: string;
         asset?: string;
+        payTo?: string;
+        scheme?: string;
         extra?: { asset?: string | number; name?: string; decimals?: number };
       }>;
     };
@@ -61,6 +65,8 @@ export function readPaymentRequired(response: Response): PaymentRequiredSummary 
       network: requirement?.network ?? 'unknown',
       asset: String(requirement?.asset ?? requirement?.extra?.asset ?? requirement?.extra?.name ?? 'unknown'),
       description: parsed.resource?.description ?? 'Paid x402 resource',
+      payTo: requirement?.payTo,
+      scheme: requirement?.scheme,
     };
   } catch {
     return null;

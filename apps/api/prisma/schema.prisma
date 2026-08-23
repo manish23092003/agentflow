@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -128,6 +128,7 @@ model ApprovalRequest {
   rejectedAt           DateTime?
   resolvedBy           String?
   resolutionReason     String?
+  originalRequirement  String?
 }
 
 // ----------------------------------------
@@ -138,6 +139,7 @@ model ResearchSession {
   id              String   @id @default(uuid())
   userId          String
   user            User?    @relation(fields: [userId], references: [id])
+  walletAddress   String?
   goal            String
   status          String   // See State Machine below
   

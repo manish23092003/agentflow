@@ -70,7 +70,8 @@ describe('SynthesisService', () => {
   // Test 1: synthesis succeeds → report persisted → COMPLETED
   it('should call updateReport with generated text on successful synthesis', async () => {
     await service.synthesize('session-1');
-    expect(repository.updateReport).toHaveBeenCalledWith('session-1', MOCK_REPORT);
+    const expectedText = `${MOCK_REPORT}\n\n### Sources\n\n[1] Test Citation\n    No URL available`;
+    expect(repository.updateReport).toHaveBeenCalledWith('session-1', expectedText);
   });
 
   // Test 2: COMPLETED state only reached after report is persisted
@@ -126,5 +127,93 @@ describe('SynthesisService', () => {
   it('should throw if session is not in SYNTHESIZING state', async () => {
     repository.getSession.mockResolvedValue({ id: 'session-1', status: ResearchState.COMPLETED, goal: 'test' });
     await expect(service.synthesize('session-1')).rejects.toThrow('Invalid state transition');
+  });
+
+  describe('Sanitization & Formatting', () => {
+    it('should map UUIDs to sequential numbers and append canonical Sources section', async () => {
+      const { generateText } = await import('ai');
+      // LLM uses mapped [1] format
+      vi.mocked(generateText).mockResolvedValueOnce({ text: 'Market growth is strong [1].' } as any);
+      
+      const cits = [
+        { id: '02ded405-85f2-495e-8925-d631e751ad1c', title: 'Source A', url: 'https://a.com', provider: 'test', snippet: '' }
+      ];
+      repository.getCitationsBySessionId.mockResolvedValue(cits);
+
+      await service.synthesize('session-1');
+      
+      const expectedReport = 'Market growth is strong [1].\n\n### Sources\n\n[1] Source A\n    https://a.com';
+      expect(repository.updateReport).toHaveBeenCalledWith('session-1', expectedReport);
+    });
+
+    it('should sanitize leaked UUIDs to their mapped number if known', async () => {
+      const { generateText } = await import('ai');
+      // LLM leaks the known UUID
+      vi.mocked(generateText).mockResolvedValueOnce({ text: 'The market is growing [02ded405-85f2-495e-8925-d631e751ad1c].' } as any);
+      
+      const cits = [
+        { id: '02ded405-85f2-495e-8925-d631e751ad1c', title: 'Source A', url: 'https://a.com', provider: 'test', snippet: '' }
+      ];
+      repository.getCitationsBySessionId.mockResolvedValue(cits);
+
+      await service.synthesize('session-1');
+      
+      const expectedReport = 'The market is growing [1].\n\n### Sources\n\n[1] Source A\n    https://a.com';
+      expect(repository.updateReport).toHaveBeenCalledWith('session-1', expectedReport);
+    });
+
+    it('should completely remove unknown/leaked UUIDs', async () => {
+      const { generateText } = await import('ai');
+      // LLM leaks a completely unknown UUID
+      vi.mocked(generateText).mockResolvedValueOnce({ text: 'The market is growing [d7aa9a8b-42cd-4a5c-85db-f3f74f781758].' } as any);
+      
+      repository.getCitationsBySessionId.mockResolvedValue([]);
+      
+      // Wait, if 0 citations it fails. Let's add 1 valid citation.
+      const cits = [
+        { id: '02ded405-85f2-495e-8925-d631e751ad1c', title: 'Source A', url: 'https://a.com', provider: 'test', snippet: '' }
+      ];
+      repository.getCitationsBySessionId.mockResolvedValue(cits);
+
+      await service.synthesize('session-1');
+      
+      // The unknown UUID is stripped, leaving brackets []. Then [] is stripped.
+      // So 'The market is growing [].' -> 'The market is growing .'
+      const expectedReport = 'The market is growing .\n\n### Sources\n\n[1] Source A\n    https://a.com';
+      expect(repository.updateReport).toHaveBeenCalledWith('session-1', expectedReport);
+    });
+
+    it('should remove LLM-generated Sources section to prevent duplicates', async () => {
+      const { generateText } = await import('ai');
+      vi.mocked(generateText).mockResolvedValueOnce({ 
+        text: 'Report body [1].\n\n## Sources\n[1] LLM Invented Source\nhttps://fake.com' 
+      } as any);
+      
+      const cits = [
+        { id: '02ded405-85f2-495e-8925-d631e751ad1c', title: 'Actual Source', url: 'https://real.com', provider: 'test', snippet: '' }
+      ];
+      repository.getCitationsBySessionId.mockResolvedValue(cits);
+
+      await service.synthesize('session-1');
+      
+      // Should replace the hallucinated sources block with the canonical one
+      const expectedReport = 'Report body [1].\n\n### Sources\n\n[1] Actual Source\n    https://real.com';
+      expect(repository.updateReport).toHaveBeenCalledWith('session-1', expectedReport);
+    });
+
+    it('should safely handle missing URL or title in citations', async () => {
+      const { generateText } = await import('ai');
+      vi.mocked(generateText).mockResolvedValueOnce({ text: 'Body [1].' } as any);
+      
+      const cits = [
+        { id: '11111111-1111-1111-1111-111111111111', title: null, url: null, provider: 'test', snippet: '' }
+      ];
+      repository.getCitationsBySessionId.mockResolvedValue(cits);
+
+      await service.synthesize('session-1');
+      
+      const expectedReport = 'Body [1].\n\n### Sources\n\n[1] N/A\n    No URL available';
+      expect(repository.updateReport).toHaveBeenCalledWith('session-1', expectedReport);
+    });
   });
 });

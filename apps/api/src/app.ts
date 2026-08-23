@@ -26,7 +26,7 @@ const app = express();
 // --- Security baseline ---
 app.use(helmet());
 app.use(cors({
-  origin: config.env === "development" ? "http://localhost:5173" : false, // Adjust in production
+  origin: config.env === "development" ? "http://localhost:5173" : (config.frontendUrl || false),
   credentials: true,
   optionsSuccessStatus: 200,
 }));

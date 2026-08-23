@@ -5,3 +5,5 @@ export * from './History';
 export * from './Approvals';
 export * from './Payments';
 export * from './Landing';
+export * from './Auth/Login';
+export * from './Auth/Signup';

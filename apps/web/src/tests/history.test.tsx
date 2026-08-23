@@ -30,9 +30,9 @@ describe('History Page', () => {
   });
 
   it('renders loading state initially', () => {
-    (api.getAllSessions as any).mockImplementation(() => new Promise(() => {})); // Never resolves
+    (api.getAllSessions as any).mockImplementation(() => new Promise(() => {})); // Never resolves to keep it loading
     render(<BrowserRouter><History /></BrowserRouter>);
-    expect(screen.getByText('Loading history…')).toBeInTheDocument();
+    expect(screen.getByText('Loading history...')).toBeInTheDocument();
   });
 
   it('renders error state on API failure', async () => {
@@ -49,7 +49,7 @@ describe('History Page', () => {
     render(<BrowserRouter><History /></BrowserRouter>);
     
     await waitFor(() => {
-      expect(screen.getByText('No research sessions yet.')).toBeInTheDocument();
+      expect(screen.getByText('No research sessions found.')).toBeInTheDocument();
     });
   });
 

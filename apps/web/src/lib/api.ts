@@ -1,20 +1,44 @@
 import { ResearchSession, Citation, PaymentRecord, ApprovalRequest } from '../types/research';
 import { AuthResponse, WalletNonceResponse, WalletVerifyResponse } from '../types/auth';
 
-const API_BASE = '/api/v1';
+const isProd = import.meta.env.PROD;
+const envUrl = import.meta.env.VITE_API_URL;
 
-async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${url}`, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-      ...options?.headers,
-    },
-  });
+if (isProd && !envUrl) {
+  throw new Error("VITE_API_URL environment variable is required in production");
+}
+
+export const API_ORIGIN = envUrl || '';
+export const API_BASE = `${API_ORIGIN}/api/v1`;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function fetchApi<T>(url: string, options?: RequestInit, attempt = 1): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${url}`, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...options?.headers,
+      },
+    });
+  } catch (error) {
+    if (attempt <= 3) {
+      await sleep(attempt === 1 ? 500 : attempt === 2 ? 1000 : 2000);
+      return fetchApi<T>(url, options, attempt + 1);
+    }
+    throw error;
+  }
 
   if (!response.ok) {
+    if (response.status >= 500 && attempt <= 3) {
+      await sleep(attempt === 1 ? 500 : attempt === 2 ? 1000 : 2000);
+      return fetchApi<T>(url, options, attempt + 1);
+    }
+
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.error?.message || errorData.error || `API request failed: ${response.statusText}`);
   }
@@ -65,10 +89,10 @@ export const api = {
   },
 
   // Research Sessions
-  startResearch: (goal: string, budget: number) => 
+  startResearch: (goal: string, budget: number, walletAddress: string) => 
     fetchApi<ResearchSession>('/research/start', {
       method: 'POST',
-      body: JSON.stringify({ goal, budget }),
+      body: JSON.stringify({ goal, budget, walletAddress }),
     }),
 
   getAllSessions: () =>
@@ -93,10 +117,10 @@ export const api = {
   getAllApprovals: () => 
     fetchApi<ApprovalRequest[]>('/agent/approvals'),
 
-  approve: (approvalId: string, payerAddress?: string) => 
+  approve: (approvalId: string, signedTransactionBase64: string, payerAddress?: string) => 
     fetchApi<{ status: string; reason?: string; payload?: { transactionId?: string; amount?: number } }>(`/agent/approve/${approvalId}`, {
       method: 'POST',
-      body: payerAddress ? JSON.stringify({ payerAddress }) : undefined,
+      body: JSON.stringify({ signedTransactionBase64, payerAddress }),
     }),
 
   reject: (approvalId: string) => 

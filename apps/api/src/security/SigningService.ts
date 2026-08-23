@@ -14,7 +14,9 @@ export class SigningService {
 
     const mnemonic = process.env.X402_CLIENT_MNEMONIC?.trim();
     if (!mnemonic) {
-      throw new Error('SigningService: X402_CLIENT_MNEMONIC is missing.');
+      console.warn('SigningService: X402_CLIENT_MNEMONIC is missing. Backend-based automated payments will fail if attempted.');
+      this.fetchWithPayment = fetch; // Fallback to normal fetch if no mnemonic is provided
+      return;
     }
     
     const network = process.env.ALGORAND_NETWORK === 'mainnet' ? 'mainnet' : 'testnet';

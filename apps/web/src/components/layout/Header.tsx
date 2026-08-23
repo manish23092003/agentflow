@@ -34,30 +34,34 @@ export const Header: React.FC = () => {
   };
 
   // Compute page context title for breadcrumb
-  const pageTitle = (() => {
+  const getBreadcrumb = () => {
     const p = location.pathname;
     if (p === '/' || p === '/dashboard') return 'Dashboard';
-    if (p.startsWith('/research/new')) return 'New Research';
-    if (p.startsWith('/research/')) return 'Research Session';
-    if (p.startsWith('/history')) return 'History';
-    if (p.startsWith('/approvals')) return 'Approvals';
-    if (p.startsWith('/payments')) return 'Payments';
+    if (p === '/research/new') return 'New Research';
+    if (p.startsWith('/research/')) return 'Workspace';
+    if (p === '/history') return 'History';
+    if (p === '/approvals') return 'Approvals';
+    if (p === '/payments') return 'Payments';
     if (p.startsWith('/settings')) return 'Settings';
-    const segment = p.replace(/^\//, '').split('/')[0];
-    return segment ? segment.charAt(0).toUpperCase() + segment.slice(1) : 'Dashboard';
-  })();
+    return '';
+  };
+  const breadcrumb = getBreadcrumb();
 
   const isWalletLinked = !!(address && wallets.some(w => w.address === address));
 
   return (
     <header className="top-header" role="banner">
       <div className="header-breadcrumb">
-        <NavLink to="/" className="header-brand-link">
+        <NavLink to="/dashboard" className="header-brand-link">
           <span className="brand-dot" />
           AgentFlow
         </NavLink>
-        <span className="nav-divider">/</span>
-        <span className="header-page-title">{pageTitle}</span>
+        {breadcrumb && (
+          <>
+            <span className="nav-divider">/</span>
+            <span className="header-page-title">{breadcrumb}</span>
+          </>
+        )}
       </div>
 
       <div className="header-right-controls flex items-center gap-2.5">

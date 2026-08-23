@@ -145,3 +145,8 @@ vite.config.ts.timestamp-*
 # Database files
 apps/api/data/payments.json
 *.db
+
+# Temporary test/debug outputs
+test_output.txt
+tests.json
+tree.txt

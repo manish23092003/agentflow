@@ -195,7 +195,6 @@ Call the ServiceDiscoveryTool.`;
 
     const latestGap = gaps[0];
     const missingInfo = JSON.parse(latestGap.missingInformation) as string[];
-    
     const candidates = await this.discoveryProvider.discover(missingInfo.join(' '), {
       allowedNetworks: this.mockPolicy.allowedNetworks,
       allowedAssets: this.mockPolicy.allowedAssets?.map(String),

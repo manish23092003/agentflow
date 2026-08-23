@@ -21,33 +21,56 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Dummy user for local bypass
-const DUMMY_USER: UserProfile = {
-  id: 'local-dummy-id',
-  email: 'local_user@agentflow.dev',
-  name: 'Local User'
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [wallets, setWallets] = useState<UserWallet[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Initialize with dummy user to bypass auth
-  useEffect(() => {
-    setUser(DUMMY_USER);
-    setIsLoading(false);
-  }, []);
-
   const refreshUser = useCallback(async () => {
-    // We bypass backend auth completely on the frontend now
-    setUser(DUMMY_USER);
-    setIsLoading(false);
+    try {
+      const res = await api.auth.getMe();
+      if (res.success && res.user) {
+        setUser(res.user);
+        setWallets(res.wallets || []);
+      } else {
+        setUser(null);
+        setWallets([]);
+      }
+    } catch {
+      setUser(null);
+      setWallets([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const login = async () => {};
-  const signup = async () => {};
-  const loginWithGoogle = async () => {};
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
+
+  const login = async (email: string, password: string) => {
+    const res = await api.auth.login({ email, password });
+    if (res.success && res.user) {
+      setUser(res.user);
+      setWallets(res.wallets || []);
+    }
+  };
+
+  const signup = async (name: string, email: string, password: string) => {
+    const res = await api.auth.signup({ name, email, password });
+    if (res.success && res.user) {
+      setUser(res.user);
+      setWallets(res.wallets || []);
+    }
+  };
+
+  const loginWithGoogle = async (credential: string) => {
+    const res = await api.auth.googleAuth(credential);
+    if (res.success && res.user) {
+      setUser(res.user);
+      setWallets(res.wallets || []);
+    }
+  };
 
   const linkWalletWithSignature = async (
     address: string,
@@ -101,7 +124,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    // No-op for local bypass
+    try {
+      await api.auth.logout();
+    } finally {
+      setUser(null);
+      setWallets([]);
+    }
   };
 
   return (
@@ -109,7 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         wallets,
-        isAuthenticated: true,
+        isAuthenticated: !!user,
         isLoading,
         login,
         signup,
@@ -131,3 +159,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

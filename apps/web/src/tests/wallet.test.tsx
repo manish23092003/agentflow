@@ -11,6 +11,9 @@ import { WalletProvider, _resetPeraWalletInstance } from '../context/WalletConte
 import { api } from '../lib/api';
 
 import { AuthProvider } from '../context/AuthContext';
+import algosdk from 'algosdk';
+
+
 
 // Use shared mock from setup.ts
 const mockPera = (globalThis as any).__mockPera;
@@ -35,6 +38,16 @@ describe('User Wallet Experience & Pera Integration', () => {
     vi.clearAllMocks();
     _resetPeraWalletInstance();
     mockReconnectSession.mockResolvedValue([]);
+    vi.spyOn(algosdk.Algodv2.prototype, 'getTransactionParams').mockReturnValue({
+      do: vi.fn().mockResolvedValue({
+        fee: 1000,
+        minFee: 1000,
+        firstValid: 1,
+        lastValid: 1000,
+        genesisID: 'testnet-v1.0',
+        genesisHash: new Uint8Array(32)
+      })
+    } as any);
   });
 
   it('renders disconnected wallet header by default with Connect Pera action', async () => {

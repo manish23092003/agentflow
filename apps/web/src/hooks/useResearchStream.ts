@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { BaseEvent } from '../types/index.js';
+import { API_BASE } from '../lib/api.js';
 
 export type ConnectionStatus = 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED';
 
@@ -29,7 +30,7 @@ export function useResearchStream(sessionId: string | undefined): UseResearchStr
 
     setConnectionStatus(reconnectAttemptsRef.current > 0 ? 'RECONNECTING' : 'DISCONNECTED');
 
-    const eventSource = new EventSource(`/api/v1/research/${sessionId}/stream`);
+    const eventSource = new EventSource(`${API_BASE}/research/${sessionId}/stream`, { withCredentials: true });
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {

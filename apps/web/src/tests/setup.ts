@@ -11,7 +11,7 @@ expect.extend(matchers);
   connect: vi.fn().mockResolvedValue([]),
   disconnect: vi.fn().mockResolvedValue(undefined),
   reconnectSession: vi.fn().mockResolvedValue([]),
-  signTransaction: vi.fn().mockResolvedValue([]),
+  signTransaction: vi.fn().mockResolvedValue([new Uint8Array([1, 2, 3])]),
 };
 
 vi.mock('@perawallet/connect', () => {

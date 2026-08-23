@@ -1,4 +1,5 @@
 import { readPaymentRequired, readPaymentResponse } from '@agentflow/x402-client';
+import { x402Client, x402HTTPClient } from '@x402/core/client';
 import type { PaymentRepository } from '../db/PaymentHistory.js';
 import type { PolicyEngine } from './PolicyEngine.js';
 import type { UserSpendingPolicy } from './types.js';
@@ -67,6 +68,7 @@ export class PaymentTool {
     if (!requirement) {
       throw new Error('Received 402 but could not parse payment requirements from headers.');
     }
+    const rawHeaderBase64 = response.headers.get('PAYMENT-REQUIRED') || response.headers.get('payment-required');
 
     logs.push(`[Agent] Payment required: ${requirement.price} USDC on network ${requirement.network}. Asset: ${requirement.asset}`);
 
@@ -101,9 +103,10 @@ export class PaymentTool {
         amount: requirement.rawAmount,
         asset: requirement.asset,
         network: requirement.network,
-        payTo: 'extracted-from-header-or-config', // Ideally derived from requirement
+        payTo: requirement.payTo || process.env.X402_PROVIDER_ADDRESS || 'unknown',
         reason: decision.reason,
-        expiresAt: expiresAt.toISOString()
+        expiresAt: expiresAt.toISOString(),
+        originalRequirement: rawHeaderBase64 || ''
       });
 
       throw new ApprovalRequiredError({
@@ -113,7 +116,7 @@ export class PaymentTool {
         amount: requirement.rawAmount.toString(),
         asset: requirement.asset,
         network: requirement.network,
-        budgetRemaining: 'Check policy limits' // Calculate if needed, but placeholder is fine per requirements
+        budgetRemaining: 'Check policy limits'
       });
     }
 
@@ -122,7 +125,7 @@ export class PaymentTool {
       resource: url,
       amount: requirement.rawAmount,
       asset: requirement.asset,
-      receiver: 'extracted-from-header-or-config', // In a full impl, payTo is in the parsed requirement. Let's just store a placeholder or extract it.
+      receiver: requirement.payTo || process.env.X402_PROVIDER_ADDRESS || 'unknown',
       network: requirement.network,
       decision: decision.decision,
       status: 'PENDING',
@@ -167,5 +170,73 @@ export class PaymentTool {
       logs.push(`[Agent] Payment failed: ${msg}`);
       throw e;
     }
+  }
+
+  async resumePaymentWithSignature(approval: import('../db/PaymentHistory.js').ApprovalRequest, signedTransactionBase64: string): Promise<string> {
+    
+
+    if (!approval.originalRequirement) {
+      throw new Error('Approval request is missing the original payment requirement. Cannot construct exact PaymentPayload.');
+    }
+
+    let accepted;
+    try {
+      const decoded = Buffer.from(approval.originalRequirement, 'base64').toString('utf8');
+      const parsed = JSON.parse(decoded);
+      if (parsed.accepts && parsed.accepts.length > 0) {
+        accepted = parsed.accepts[0];
+      }
+    } catch (e) {
+      throw new Error(`Failed to parse originalRequirement: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    
+    if (!accepted) {
+      throw new Error('Failed to extract exact accepted requirement from originalRequirement.');
+    }
+
+    // Construct the x402 V2 payment payload matching the schema expected by @x402/core:
+    const paymentPayload = {
+      x402Version: 2 as const,
+      accepted,
+      payload: {
+        paymentGroup: [signedTransactionBase64],
+        paymentIndex: 0
+      }
+    };
+
+
+
+    
+    const client = new x402Client();
+    const httpClient = new x402HTTPClient(client);
+    const headers = httpClient.encodePaymentSignatureHeader(paymentPayload);
+
+    const res = await fetch(approval.resourceUrl, {
+      headers
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      const prHeader = res.headers.get('PAYMENT-REQUIRED') || res.headers.get('payment-required');
+      
+      let parsedHeader = '';
+      if (prHeader) {
+        try {
+           parsedHeader = Buffer.from(prHeader, 'base64').toString('utf8');
+        } catch {
+           // ignore parsing error
+        }
+      }
+
+      console.error('--- PAID RESOURCE FETCH FAILED ---');
+      console.error('Status:', res.status);
+      console.error('Body:', body);
+      console.error('PAYMENT-REQUIRED Header decoded:', parsedHeader);
+      console.error('----------------------------------');
+
+      throw new Error(`Failed to fetch paid resource after providing signature: HTTP ${res.status} ${body} (Header: ${parsedHeader})`);
+    }
+
+    return await res.text();
   }
 }

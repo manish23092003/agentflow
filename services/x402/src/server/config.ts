@@ -22,9 +22,9 @@ export function loadConfig(): RuntimeConfig {
     throw new Error('ALGORAND_NETWORK must be "testnet" for this Proof of Concept.');
   }
 
-  const payTo = process.env.X402_PAY_TO_ADDRESS;
+  const payTo = process.env.X402_PROVIDER_ADDRESS || process.env.X402_PAY_TO_ADDRESS;
   if (!payTo || !algosdk.isValidAddress(payTo)) {
-    throw new Error('X402_PAY_TO_ADDRESS must be a valid Algorand address.');
+    throw new Error('X402_PROVIDER_ADDRESS must be a valid Algorand address.');
   }
 
   const price = process.env.X402_PRICE;

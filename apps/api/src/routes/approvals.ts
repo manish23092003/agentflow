@@ -10,6 +10,7 @@ import { PaymentTool } from '../agent/PaymentTool.js';
 import { ResearchState } from '../agent/ResearchStateMachine.js';
 import { researchEvents } from '../research/ResearchEventService.js';
 import { optionalAuth } from '../middleware/auth.js';
+import algosdk from 'algosdk';
 
 import { ResearchAgent } from '../agent/ResearchAgent.js';
 import { TavilySearchProvider } from '../research/providers/TavilySearchProvider.js';
@@ -38,7 +39,7 @@ const mockPolicy: UserSpendingPolicy = {
   dailyLimit: 1000000000,
   allowedAssets: [10458941], // USDC on Algorand TestNet
   allowedNetworks: ['testnet', 'algorand-testnet', 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI='],
-  requireApprovalAbove: 5000 // 0.005 USDC
+  requireApprovalAbove: 0 // Require approval for ALL paid resources
 };
 
 const orchestrator = new ResearchOrchestrator(
@@ -175,10 +176,60 @@ router.post('/approve/:approvalId', optionalAuth, async (req: Request, res: Resp
       return res.status(400).json({ status: 'FAILED', reason: 'Associated payment record is not in PENDING_APPROVAL state' });
     }
 
+    // Validate signed transaction first!
+    const signedTransactionBase64 = req.body?.signedTransactionBase64;
+    if (!signedTransactionBase64) {
+      return res.status(400).json({ status: 'FAILED', reason: 'Missing signedTransactionBase64' });
+    }
+
+    try {
+      const decoded = algosdk.decodeSignedTransaction(Buffer.from(signedTransactionBase64, 'base64'));
+      const txn = decoded.txn;
+      
+      if (txn.type !== algosdk.TransactionType.axfer) {
+        return res.status(400).json({ status: 'FAILED', reason: 'Invalid transaction type, expected axfer' });
+      }
+      
+      const session = await prisma.researchSession.findUnique({ where: { id: paymentRecord.researchSessionId! } });
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const txnAny = txn as any;
+      
+      const senderAddr = txnAny.from ? algosdk.encodeAddress(txnAny.from.publicKey) : txnAny.sender?.toString();
+      const receiverAddr = txn.assetTransfer?.receiver ? algosdk.encodeAddress(txn.assetTransfer.receiver.publicKey) : algosdk.encodeAddress(txnAny.to?.publicKey || txnAny.assetTransfer?.to?.publicKey);
+      const txAssetIndex = txn.assetTransfer?.assetIndex?.toString() || txnAny.assetIndex?.toString() || 'unknown';
+      const txAmount = txn.assetTransfer?.amount?.toString() || txnAny.amount?.toString() || 'unknown';
+
+      if (session?.walletAddress && senderAddr !== session.walletAddress) {
+        return res.status(400).json({ status: 'FAILED', reason: `Sender ${senderAddr} does not match session wallet ${session.walletAddress}` });
+      }
+      
+      if (receiverAddr !== approval.payTo) {
+        return res.status(400).json({ status: 'FAILED', reason: `Receiver ${receiverAddr} does not match required provider ${approval.payTo}` });
+      }
+
+      if (txAssetIndex !== approval.asset.toString()) {
+        return res.status(400).json({ status: 'FAILED', reason: `Asset ${txAssetIndex} does not match required asset ${approval.asset}` });
+      }
+      
+      if (txAmount !== approval.amount.toString()) {
+        return res.status(400).json({ status: 'FAILED', reason: `Amount ${txAmount} does not match required amount ${approval.amount}` });
+      }
+    } catch (e: unknown) {
+      console.error('Validation error:', e);
+      return res.status(400).json({ status: 'FAILED', reason: 'Failed to decode or validate signed transaction' });
+    }
+
+    const result = await procurementService.resumeApproval(approvalId, mockPolicy, signedTransactionBase64);
+    
+    if (result.status !== 'SUCCESS') {
+      return res.status(400).json(result);
+    }
+
+    // Only update DB to APPROVED if the payment was actually successful
     const resolvedBy = req.user ? req.user.email : 'user';
 
-    // Atomic update
-    const updated = await prisma.approvalRequest.updateMany({
+    await prisma.approvalRequest.updateMany({
       where: { id: approvalId, status: 'PENDING' },
       data: {
         status: 'APPROVED',
@@ -186,10 +237,6 @@ router.post('/approve/:approvalId', optionalAuth, async (req: Request, res: Resp
         resolvedBy
       }
     });
-
-    if (updated.count === 0) {
-      return res.status(409).json({ status: 'FAILED', reason: 'Race condition: Approval request no longer pending' });
-    }
 
     const payerAddress = req.body?.payerAddress || paymentRecord.payerAddress;
     const userId = req.user?.id || paymentRecord.userId;
@@ -202,13 +249,6 @@ router.post('/approve/:approvalId', optionalAuth, async (req: Request, res: Resp
         ...(payerAddress && { payerAddress })
       }
     });
-
-    // Resume flow via ProcurementService
-    const result = await procurementService.resumeApproval(approvalId, mockPolicy);
-
-    if (result.status !== 'SUCCESS') {
-      return res.status(400).json(result);
-    }
 
     if (paymentRecord.researchSessionId) {
       orchestrator.run(paymentRecord.researchSessionId).catch(console.error);

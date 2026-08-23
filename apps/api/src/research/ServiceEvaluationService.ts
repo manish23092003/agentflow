@@ -10,8 +10,12 @@ import type { UserSpendingPolicy } from '../agent/types.js';
 import { researchEvents } from './ResearchEventService.js';
 
 export const ServiceEvaluationSchema = z.object({
-  selectedServiceId: z.string().nullable().describe("The ID of the best service to procure, or null if none are eligible/worthwhile."),
-  reason: z.string().describe("Explanation for why this service was selected or why none were selected."),
+  decision: z.enum(['PURCHASE', 'SKIP']).describe("Explicit economic decision whether to purchase the best resource or skip."),
+  resourceId: z.string().nullable().describe("The ID of the best service to procure, if any."),
+  price: z.number().describe("The price of the resource being evaluated."),
+  currency: z.string().describe("The currency of the resource."),
+  confidence: z.number().describe("Confidence score between 0.0 and 1.0 for this decision."),
+  reason: z.string().describe("Explanation for why this service was selected or why we should skip."),
   relevanceScore: z.number().describe("A score between 0.0 and 1.0 indicating how relevant the service is to the gap."),
   expectedValue: z.enum(['LOW', 'MEDIUM', 'HIGH']).describe("The expected value this service adds toward resolving the gap."),
   alternative: z.string().optional().describe("A cheaper or alternative approach if applicable.")
@@ -67,10 +71,15 @@ export class ServiceEvaluationService {
       capabilities: c.capabilities
     }));
 
-    const systemPrompt = `You are AgentFlow's Service Evaluator.
-Given a research gap and a list of discovered paid services, your job is to select the single best service that addresses the gap, if one exists and is worth the cost.
-Evaluate relevance, expected value, and price.
-If no service is highly relevant or worth the price, return selectedServiceId as null.
+    const systemPrompt = `You are AgentFlow's Autonomous Procurement Agent.
+Given a research gap and a list of discovered paid services, your job is to make an explicit economic decision on whether to PURCHASE a paid resource or SKIP it.
+Evaluate relevance, expected value, price, and remaining budget. Compare the paid resource's incremental value against existing free sources.
+- Do NOT purchase if free sources provide sufficient evidence.
+- Do NOT purchase if the price exceeds the remaining budget.
+- ONLY purchase if the paid resource provides meaningful, unique additional value.
+- IMPORTANT: If the gap specifically requires proprietary data, detailed quantitative datasets, revenue forecasts, enterprise adoption metrics, or structured APIs, and a paid resource explicitly provides this, the resource offers highly unique and meaningful value that free web snippets cannot match. In this case, you MUST purchase it.
+If you decide to SKIP, set decision to 'SKIP' and explain why in 'reason'.
+If you decide to PURCHASE, set decision to 'PURCHASE', set 'resourceId' to the service ID, and explain the expected value in 'reason'.
 DO NOT invent service IDs. Only use the IDs provided.`;
 
     const userPrompt = `
@@ -98,16 +107,21 @@ ${JSON.stringify(safeCandidates, null, 2)}
     } catch (error) {
       console.warn('[ServiceEvaluationService] LLM evaluation fallback to top candidate due to API error:', error);
       evaluationResult = {
-        selectedServiceId: candidates[0].id,
-        reason: 'Selected premium research candidate based on highest relevance score and match with missing quantitative projections.',
+        decision: 'PURCHASE',
+        resourceId: candidates[0].id,
+        price: candidates[0].priceUsdc || 0,
+        currency: 'USDC',
+        confidence: 0.9,
+        reason: 'Selected premium research candidate based on highest relevance score.',
         relevanceScore: 0.95,
         expectedValue: 'HIGH',
         alternative: 'None'
       };
     }
 
-    // 3. Handle NO-SERVICE scenario
-    if (!evaluationResult.selectedServiceId) {
+    // 3. Handle NO-SERVICE / SKIP scenario
+
+    if (evaluationResult.decision === 'SKIP' || !evaluationResult.resourceId) {
       // Record a recommendation with NO_ELIGIBLE_SERVICE status
       await this.repository.createRecommendation({
         researchSessionId: sessionId,
@@ -135,10 +149,10 @@ ${JSON.stringify(safeCandidates, null, 2)}
       return;
     }
 
-    researchEvents.emitServiceEvaluated(sessionId, evaluationResult.selectedServiceId, true, evaluationResult.reason);
+    researchEvents.emitServiceEvaluated(sessionId, evaluationResult.resourceId, true, evaluationResult.reason);
 
     // 4. Resolve Candidate & Validate Deterministically
-    const selectedCandidate = candidates.find(c => c.id === evaluationResult.selectedServiceId);
+    const selectedCandidate = candidates.find(c => c.id === evaluationResult.resourceId);
 
     if (!selectedCandidate) {
       // LLM hallucinated an ID
@@ -148,7 +162,7 @@ ${JSON.stringify(safeCandidates, null, 2)}
         ResearchState.SERVICE_EVALUATION,
         ResearchState.FAILED
       );
-      throw new Error(`LLM selected invalid service ID: ${evaluationResult.selectedServiceId}`);
+      throw new Error(`LLM selected invalid service ID: ${evaluationResult.resourceId}`);
     }
 
     // Validate remaining budget
@@ -230,12 +244,23 @@ ${JSON.stringify(safeCandidates, null, 2)}
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 1);
 
+        // Fetch the 402 Payment Required header to ensure we have the exact originalRequirement
+        let originalRequirementStr = '';
+        try {
+          const fetchRes = await fetch(selectedCandidate.url);
+          if (fetchRes.status === 402) {
+            originalRequirementStr = fetchRes.headers.get('PAYMENT-REQUIRED') || fetchRes.headers.get('payment-required') || '';
+          }
+        } catch (e) {
+          console.warn('[ServiceEvaluationService] Failed to fetch 402 header prior to approval:', e);
+        }
+
         const paymentRecord = await this.repository['db'].paymentRecord.create({
           data: {
             researchSessionId: sessionId,
             amount: selectedCandidate.rawAmount,
             asset: selectedCandidate.asset,
-            receiver: selectedCandidate.url,
+            receiver: selectedCandidate.payTo,
             network: selectedCandidate.network,
             decision: 'REQUIRES_APPROVAL',
             status: 'PENDING_APPROVAL',
@@ -251,9 +276,10 @@ ${JSON.stringify(safeCandidates, null, 2)}
             amount: selectedCandidate.rawAmount,
             asset: selectedCandidate.asset,
             network: selectedCandidate.network,
-            payTo: selectedCandidate.url,
+            payTo: selectedCandidate.payTo,
             reason: policyDecision.reason || evaluationResult.reason,
-            expiresAt: expiresAt.toISOString()
+            expiresAt: expiresAt.toISOString(),
+            originalRequirement: originalRequirementStr
           }
         });
         approvalId = approval.id;

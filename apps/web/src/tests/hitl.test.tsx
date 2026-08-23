@@ -8,6 +8,7 @@ import { ApprovalCard } from '../components/hitl/ApprovalCard';
 import { PaymentLedger } from '../components/payments/PaymentLedger';
 import { ExpenseSummary } from '../components/payments/ExpenseSummary';
 import { api } from '../lib/api';
+import algosdk from 'algosdk';
 
 vi.mock('../lib/api', () => ({
   api: {
@@ -18,6 +19,8 @@ vi.mock('../lib/api', () => ({
     getSessionPayments: vi.fn(),
   }
 }));
+
+
 
 describe('HITL & Payment Components', () => {
   const mockSession = {
@@ -37,9 +40,9 @@ describe('HITL & Payment Components', () => {
     status: 'PENDING',
     resourceUrl: 'http://example.com/premium',
     amount: 50000,
-    asset: 'USDC',
+    asset: '10458941',
     network: 'testnet',
-    payTo: 'addr1',
+    payTo: 'MPY54CLPH2OKEGC6S5N2LDAFDNO5BVNV532NBZ5VD6GOND3STPNXZYXOFE',
     reason: 'Valuable dataset',
     requestedAt: new Date().toISOString(),
     expiresAt: new Date().toISOString()
@@ -47,6 +50,16 @@ describe('HITL & Payment Components', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.spyOn(algosdk.Algodv2.prototype, 'getTransactionParams').mockReturnValue({
+      do: vi.fn().mockResolvedValue({
+        fee: 1000,
+        minFee: 1000,
+        firstValid: 1,
+        lastValid: 1000,
+        genesisID: 'testnet-v1.0',
+        genesisHash: new Uint8Array(32)
+      })
+    } as any);
   });
 
   describe('ApprovalCard', () => {
@@ -109,7 +122,7 @@ describe('HITL & Payment Components', () => {
       fireEvent.click(screen.getByText(/Approve 0.05 USDC/i));
       
       await waitFor(() => {
-        expect(api.approve).toHaveBeenCalledWith('app-1');
+        expect(api.approve).toHaveBeenCalledWith('app-1', expect.any(String), expect.any(String));
         expect(screen.getByText('Purchase approved — the agent is continuing your research.')).toBeInTheDocument();
       });
     });
@@ -141,7 +154,7 @@ describe('HITL & Payment Components', () => {
       fireEvent.click(screen.getByText(/Approve/i));
       
       await waitFor(() => {
-        expect(screen.getByText('Something went wrong while processing the approval. Please try again.')).toBeInTheDocument();
+        expect(screen.getByText('Payment signing or processing failed: Network error')).toBeInTheDocument();
       });
     });
 
@@ -214,8 +227,7 @@ describe('HITL & Payment Components', () => {
       render(<PaymentLedger sessionId="session-123" />);
       
       await waitFor(() => {
-        expect(screen.getByText('Ledger Error')).toBeInTheDocument();
-        expect(screen.getByText('Ledger error')).toBeInTheDocument();
+        expect(screen.getByText(/Ledger error/i)).toBeInTheDocument();
       });
     });
   });

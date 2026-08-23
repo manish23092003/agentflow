@@ -108,6 +108,7 @@ export class ServiceNormalizer {
       asset: selectedAccepts.asset!,
       network: selectedAccepts.network!,
       paymentScheme: selectedAccepts.scheme!,
+      payTo: selectedAccepts.payTo || process.env.X402_PROVIDER_ADDRESS || 'unknown',
       provider: raw.merchantId,
       capabilities: [raw.method || 'GET'],
       metadata: {

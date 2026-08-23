@@ -38,7 +38,7 @@ const mockPolicy: UserSpendingPolicy = {
   dailyLimit: 1000000000,
   allowedAssets: [10458941],
   allowedNetworks: ['testnet', 'algorand-testnet', 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI='],
-  requireApprovalAbove: 5000
+  requireApprovalAbove: 0 // Require approval for ALL paid resources
 };
 
 const orchestrator = new ResearchOrchestrator(
@@ -53,7 +53,8 @@ const orchestrator = new ResearchOrchestrator(
 
 const StartResearchSchema = z.object({
   goal: z.string(),
-  budget: z.number().int().min(0) // USDC base units
+  budget: z.number().int().min(0), // USDC base units
+  walletAddress: z.string().min(58).max(58)
 });
 
 researchRouter.post('/start', requireAuth, async (req, res) => {
@@ -65,7 +66,8 @@ researchRouter.post('/start', requireAuth, async (req, res) => {
     const session = await repository.createSession(
       userId,
       data.goal,
-      data.budget
+      data.budget,
+      data.walletAddress
     );
 
     // Run the orchestrator asynchronously in the background

@@ -16,6 +16,7 @@ export class MockServiceDiscoveryProvider implements ServiceDiscoveryProvider {
         asset: '10458941',
         network: 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=',
         paymentScheme: 'exact',
+        payTo: process.env.X402_PROVIDER_ADDRESS || 'NLWHCGS5Q5GEQYV3PCJGQPZ5PK7JBDJBKJBI2W2ZFYGV6YEOHCE5RJVLJU',
         source: 'x402-resource-server'
       },
       {
@@ -29,6 +30,7 @@ export class MockServiceDiscoveryProvider implements ServiceDiscoveryProvider {
         asset: '10458941',
         network: 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=',
         paymentScheme: 'exact',
+        payTo: process.env.X402_PROVIDER_ADDRESS || 'NLWHCGS5Q5GEQYV3PCJGQPZ5PK7JBDJBKJBI2W2ZFYGV6YEOHCE5RJVLJU',
         source: 'x402-resource-server'
       }
     ];

@@ -38,6 +38,7 @@ export interface ApprovalRequest {
   rejectedAt?: string;
   resolvedBy?: string;
   resolutionReason?: string;
+  originalRequirement?: string;
 }
 
 export interface PaymentRepository {
@@ -236,7 +237,8 @@ export class PrismaPaymentRepository implements PaymentRepository {
         network: data.network,
         payTo: data.payTo,
         reason: data.reason,
-        expiresAt: new Date(data.expiresAt)
+        expiresAt: new Date(data.expiresAt),
+        originalRequirement: data.originalRequirement
       }
     });
     return this.mapApproval(dbRecord);
@@ -284,7 +286,8 @@ export class PrismaPaymentRepository implements PaymentRepository {
       approvedAt: dbRecord.approvedAt?.toISOString(),
       rejectedAt: dbRecord.rejectedAt?.toISOString(),
       resolvedBy: dbRecord.resolvedBy ?? undefined,
-      resolutionReason: dbRecord.resolutionReason ?? undefined
+      resolutionReason: dbRecord.resolutionReason ?? undefined,
+      originalRequirement: dbRecord.originalRequirement ?? undefined
     };
   }
 }

@@ -14,6 +14,16 @@ vi.mock('../lib/api', () => ({
   }
 }));
 
+// Mock the wallet context
+vi.mock('../context/WalletContext', () => ({
+  useWallet: () => ({
+    isConnected: true,
+    address: 'test-wallet-address',
+    connect: vi.fn(),
+    isConnecting: false,
+  })
+}));
+
 // Mock useNavigate
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -111,7 +121,7 @@ describe('NewResearch — Start Research button', () => {
 
     await waitFor(() => {
       // Budget: 2.50 USDC = 2,500,000 base units
-      expect(api.startResearch).toHaveBeenCalledWith('Test research goal', 2_500_000);
+      expect(api.startResearch).toHaveBeenCalledWith('Test research goal', 2_500_000, 'test-wallet-address');
       expect(mockNavigate).toHaveBeenCalledWith('/research/session-abc');
     });
   });
@@ -160,10 +170,11 @@ describe('NewResearch — Start Research button', () => {
 
     await waitFor(() => {
       const call = (api.startResearch as any).mock.calls[0];
-      // Only goal (string) and budget (number) — no payment fields
-      expect(call).toHaveLength(2);
+      // Only goal (string), budget (number), and walletAddress (string) — no payment fields
+      expect(call).toHaveLength(3);
       expect(typeof call[0]).toBe('string');
       expect(typeof call[1]).toBe('number');
+      expect(typeof call[2]).toBe('string');
     });
   });
 });

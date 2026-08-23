@@ -26,6 +26,7 @@ export interface DiscoveredService {
   asset: string;
   network: string;
   paymentScheme: string;
+  payTo: string;
   provider?: string;
   capabilities?: string[];
   metadata?: Record<string, unknown>;

@@ -7,6 +7,9 @@ import { ResearchStateMachine, ResearchState } from './ResearchStateMachine.js';
 import { config } from '../config.js';
 import { LLMExecutionError, parseLlmError } from './errors.js';
 import { researchEvents } from '../research/ResearchEventService.js';
+import { createLogger } from '@agentflow/shared';
+
+const logger = createLogger(config.logLevel);
 
 export class ResearchAgent {
   private webSearchTool: WebSearchTool;
@@ -37,8 +40,8 @@ When you are satisfied that you have exhausted free search options for this phas
     const model = llmProvider.getModel();
 
     try {
-      console.log(`[Diagnostic] Model Name: "google" - "${config.geminiModel}"`);
-      console.log(`[Diagnostic] Gemini provider initialized successfully`);
+      logger.debug(`[Diagnostic] Model Name: "google" - "${config.geminiModel}"`);
+      logger.debug(`[Diagnostic] Gemini provider initialized successfully`);
       
       const toolDef = this.webSearchTool.getDefinition(sessionId);
 
@@ -55,8 +58,8 @@ When you are satisfied that you have exhausted free search options for this phas
         maxRetries: 3,
       });
 
-      console.log(`[Diagnostic] LLM returned text: "${result.text}"`);
-      console.log(`[Diagnostic] Tool Call Count (from LLM): ${result.toolCalls?.length || 0}`);
+      logger.debug(`[Diagnostic] LLM returned text: "${result.text}"`);
+      logger.debug(`[Diagnostic] Tool Call Count (from LLM): ${result.toolCalls?.length || 0}`);
       
       if (!result.toolCalls || result.toolCalls.length === 0) {
         throw new LLMExecutionError(

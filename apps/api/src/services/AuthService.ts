@@ -166,35 +166,101 @@ export class AuthService {
   }
 
   /**
-   * Authenticates or registers a user via Google OAuth (ID token / Credential).
-   * Verifies with Google's tokeninfo service server-side.
+   * Generates the Google OAuth 2.0 authorization URL.
    */
-  async googleAuth(credential: string): Promise<User> {
-    if (!credential || typeof credential !== 'string') {
-      throw new Error('Google credential token is required');
+  getGoogleAuthUrl(): string {
+    if (!config.auth.googleClientId || !config.auth.googleRedirectUri) {
+      throw new Error('Google OAuth configuration is missing');
     }
 
-    // Verify token with Google OIDC tokeninfo endpoint
-    const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
-    if (!response.ok) {
-      throw new Error('Failed to verify Google credential');
-    }
-
-    const payload = await response.json() as {
-      sub: string;
-      email?: string;
-      name?: string;
-      picture?: string;
-      aud?: string;
+    const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+    const options = {
+      client_id: config.auth.googleClientId,
+      redirect_uri: config.auth.googleRedirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'offline',
+      prompt: 'select_account'
     };
 
-    if (!payload.sub || !payload.email) {
+    const qs = new URLSearchParams(options);
+    return `${rootUrl}?${qs.toString()}`;
+  }
+
+  /**
+   * Handles the Google OAuth callback, exchanges the code for tokens,
+   * verifies the ID token, and authenticates or registers the user.
+   */
+  async handleGoogleCallback(code: string): Promise<User> {
+    if (!code || typeof code !== 'string') {
+      throw new Error('Google authorization code is required');
+    }
+
+    if (!config.auth.googleClientId || !config.auth.googleClientSecret || !config.auth.googleRedirectUri) {
+      throw new Error('Google OAuth configuration is missing');
+    }
+
+    // Exchange authorization code for tokens
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: config.auth.googleClientId,
+        client_secret: config.auth.googleClientSecret,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: config.auth.googleRedirectUri
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.text();
+      throw new Error(`Failed to exchange Google authorization code: ${errorData}`);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tokens: any = await tokenResponse.json();
+    const idToken = tokens.id_token;
+
+    if (!idToken) {
+      throw new Error('Google token response did not contain an ID token');
+    }
+
+    // We can use the OAuth2Client from google-auth-library to securely verify the ID token.
+    const { OAuth2Client } = await import('google-auth-library');
+    const client = new OAuth2Client(config.auth.googleClientId);
+
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: config.auth.googleClientId
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) {
       throw new Error('Invalid Google credential payload');
+    }
+
+    if (!payload.email_verified) {
+      throw new Error('Google email is not verified');
+    }
+
+    if (!payload.sub || !payload.email) {
+      throw new Error('Missing sub or email in Google payload');
     }
 
     const googleId = payload.sub;
     const normalizedEmail = payload.email.trim().toLowerCase();
-    const name = payload.name || normalizedEmail.split('@')[0];
+    
+    // Fallback logic for name if given_name/family_name are somehow missing
+    let name = payload.name;
+    if (!name) {
+      if (payload.given_name && payload.family_name) {
+        name = `${payload.given_name} ${payload.family_name}`;
+      } else {
+        name = normalizedEmail.split('@')[0];
+      }
+    }
+    
     const avatarUrl = payload.picture || null;
 
     // Check if user already exists by googleId or email

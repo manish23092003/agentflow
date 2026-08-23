@@ -97,7 +97,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({ approvalId, session 
 
       <div className="mt-8 pt-6 border-t border-[var(--color-warning-border)]">
         <ApprovalActions
-          approvalId={approval.id}
+          approval={approval}
           currentState={currentState}
           costDisplay={formatBaseUnits(approval.amount, approval.asset)}
           onStateChange={setCurrentState}

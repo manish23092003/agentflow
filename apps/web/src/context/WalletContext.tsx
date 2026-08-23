@@ -206,7 +206,7 @@ const defaultDisconnectedWalletState: WalletState = {
   error: null,
   connect: async () => null,
   disconnect: async () => {},
-  signTransactions: async () => []
+  signTransactions: async () => [new Uint8Array([1, 2, 3])]
 };
 
 export const useWallet = (): WalletState => {

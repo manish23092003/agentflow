@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { Wallet } from 'lucide-react';
+import { useWallet } from '../context/WalletContext';
 
 const EXAMPLE_PROMPTS = [
   'Research the impact of AI on hiring in the Indian IT industry in 2026',
@@ -15,7 +17,14 @@ export const NewResearch = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { isConnected, address, connect, isConnecting } = useWallet();
+
   const handleStart = async () => {
+    if (!isConnected || !address) {
+      setError('Please connect your Pera Wallet first.');
+      return;
+    }
+
     const trimmedGoal = goal.trim();
     if (!trimmedGoal) {
       setError('Please describe what you want to research.');
@@ -34,7 +43,7 @@ export const NewResearch = () => {
     setError(null);
 
     try {
-      const session = await api.startResearch(trimmedGoal, budgetBaseUnits);
+      const session = await api.startResearch(trimmedGoal, budgetBaseUnits, address);
       navigate(`/research/${session.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to start research session. Please try again.');
@@ -116,11 +125,18 @@ export const NewResearch = () => {
           <div className="budget-help">Free sources are always searched first. You'll be asked before anything is purchased.</div>
         </div>
 
-        <div className="compose-cta">
+        <div className="compose-cta flex flex-row items-center">
           {error && <div role="alert" style={{ color: 'var(--red)', marginRight: 16, alignSelf: 'center', fontSize: 14 }}>{error}</div>}
-          <button className="btn btn-primary" onClick={handleStart} disabled={loading}>
-            {loading ? 'Starting...' : 'Start Research →'}
-          </button>
+          {!isConnected ? (
+            <button className="btn btn-primary bg-yellow-500 text-black hover:bg-yellow-600" onClick={connect} disabled={isConnecting}>
+              <Wallet size={16} className="inline mr-2" />
+              Connect Pera Wallet to start paid research
+            </button>
+          ) : (
+            <button className="btn btn-primary" onClick={handleStart} disabled={loading}>
+              {loading ? 'Starting...' : 'Start Research →'}
+            </button>
+          )}
         </div>
       </div>
     </div>

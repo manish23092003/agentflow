@@ -1,637 +1,375 @@
-import React, { useRef, useMemo, useEffect, Suspense, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
-import { motion, useScroll, useTransform, useInView } from 'framer-motion';
-import * as THREE from 'three';
+import '../marketing.css';
 
-// ─── Color System ─────────────────────────────────────────────────────────────
-// Pure black + Cyan + Amber. No purple. No generic AI gradients.
-const C = {
-  bg: '#000000',
-  surface: 'rgba(255,255,255,0.03)',
-  border: 'rgba(255,255,255,0.07)',
-  borderStrong: 'rgba(255,255,255,0.14)',
-  cyan: '#22d3ee',
-  cyanDim: 'rgba(34,211,238,0.12)',
-  amber: '#f59e0b',
-  amberDim: 'rgba(245,158,11,0.12)',
-  green: '#4ade80',
-  greenDim: 'rgba(74,222,128,0.10)',
-  rose: '#fb7185',
-  roseDim: 'rgba(251,113,133,0.10)',
-  text: '#fafafa',
-  textMuted: '#71717a',
-  textFaint: '#3f3f46',
-};
-
-// ─── 3D: Data Globe ───────────────────────────────────────────────────────────
-// Represents "researching the web" — a globe with data connection arcs
-// Each arc is a source-to-destination connection, like data being retrieved
-
-const GlobeScene = () => {
-  const groupRef = useRef<THREE.Group>(null);
-
-  // Latitude/longitude grid points on a sphere
-  const { gridPoints, arcPairs } = useMemo(() => {
-    const pts: THREE.Vector3[] = [];
-    const R = 2.0;
-    // Spiral distribution for even spacing
-    const N = 120;
-    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-    for (let i = 0; i < N; i++) {
-      const y = 1 - (i / (N - 1)) * 2;
-      const r = Math.sqrt(1 - y * y);
-      const theta = goldenAngle * i;
-      pts.push(new THREE.Vector3(R * r * Math.cos(theta), R * y, R * r * Math.sin(theta)));
-    }
-
-    // Pick 18 random arcs between distant points (data connections)
-    const arcs: [THREE.Vector3, THREE.Vector3][] = [];
-    const used = new Set<number>();
-    let attempts = 0;
-    while (arcs.length < 18 && attempts < 200) {
-      attempts++;
-      const a = Math.floor(Math.random() * N);
-      const b = Math.floor(Math.random() * N);
-      if (a === b || used.has(a * N + b)) continue;
-      if (pts[a].distanceTo(pts[b]) < 1.5) continue; // must be far apart
-      used.add(a * N + b);
-      arcs.push([pts[a], pts[b]]);
-    }
-    return { gridPoints: pts, arcPairs: arcs };
-  }, []);
-
-  // Build arc geometries (great-circle arcs lifted above surface)
-  const arcGeometries = useMemo(() =>
-    arcPairs.map(([a, b]) => {
-      const curve = new THREE.QuadraticBezierCurve3(
-        a,
-        new THREE.Vector3(
-          (a.x + b.x) * 0.5 * 1.6,
-          (a.y + b.y) * 0.5 * 1.6,
-          (a.z + b.z) * 0.5 * 1.6,
-        ),
-        b
-      );
-      const points = curve.getPoints(50);
-      const geom = new THREE.BufferGeometry().setFromPoints(points);
-      return geom;
-    }), [arcPairs]);
-
-  // Points geometry for the globe dots
-  const dotsGeometry = useMemo(() => {
-    const positions = new Float32Array(gridPoints.length * 3);
-    gridPoints.forEach((p, i) => {
-      positions[i * 3] = p.x;
-      positions[i * 3 + 1] = p.y;
-      positions[i * 3 + 2] = p.z;
-    });
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    return g;
-  }, [gridPoints]);
-
-  // Animated pulsing arc - one arc glows bright at a time
-  const [activeArc, setActiveArc] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setActiveArc(a => (a + 1) % arcPairs.length), 800);
-    return () => clearInterval(id);
-  }, [arcPairs.length]);
-
-  useFrame(({ clock }) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y = clock.getElapsedTime() * 0.08;
-    }
-  });
-
-  return (
-    <group ref={groupRef}>
-      {/* Globe wire dots */}
-      <points geometry={dotsGeometry}>
-        <pointsMaterial
-          size={0.045}
-          color="#22d3ee"
-          transparent
-          opacity={0.45}
-          sizeAttenuation
-        />
-      </points>
-
-      {/* Dim arcs */}
-      {arcGeometries.map((geom, i) => (
-        // @ts-expect-error - Ignore R3F intrinsic element type error
-        <line key={i} geometry={geom}>
-          <lineBasicMaterial
-            color={i === activeArc ? '#22d3ee' : '#0e4a52'}
-            transparent
-            opacity={i === activeArc ? 1.0 : 0.25}
-          />
-        </line>
-      ))}
-
-      {/* Active arc bright dot at destination */}
-      {arcPairs[activeArc] && (
-        <mesh position={arcPairs[activeArc][1]}>
-          <sphereGeometry args={[0.06, 8, 8]} />
-          <meshBasicMaterial color="#22d3ee" />
-        </mesh>
-      )}
-    </group>
-  );
-};
-
-const DataGlobe = () => (
-  <Canvas
-    camera={{ position: [0, 0, 5.5], fov: 50 }}
-    style={{ background: 'transparent', width: '100%', height: '100%' }}
-    gl={{ antialias: true, alpha: true }}
-  >
-    <ambientLight intensity={0.2} />
-    <pointLight position={[4, 4, 4]} color="#22d3ee" intensity={2} />
-    <pointLight position={[-4, -4, -4]} color="#f59e0b" intensity={0.5} />
-    <Suspense fallback={null}>
-      <GlobeScene />
-      <EffectComposer>
-        <Bloom
-          luminanceThreshold={0.1}
-          luminanceSmoothing={0.5}
-          intensity={1.6}
-          radius={0.7}
-        />
-      </EffectComposer>
-    </Suspense>
-    <OrbitControls enableZoom={false} enablePan={false} autoRotate={false} />
-  </Canvas>
-);
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const fade = {
-  hidden: { opacity: 0, y: 32 },
-  show: (i: number = 0) => ({
-    opacity: 1, y: 0,
-    transition: { duration: 0.65, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] as const },
-  }),
-};
-const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.09 } } };
-
-// ─── Typewriter ───────────────────────────────────────────────────────────────
-
-const WORDS = ['deep insights', 'cited reports', 'accurate answers', 'sourced analysis', 'verified data'];
-const Typewriter = () => {
-  const [wi, setWi] = useState(0);
-  const [txt, setTxt] = useState('');
-  const [del, setDel] = useState(false);
-
-  useEffect(() => {
-    const word = WORDS[wi];
-    let t: ReturnType<typeof setTimeout>;
-    if (!del && txt.length < word.length)       t = setTimeout(() => setTxt(word.slice(0, txt.length + 1)), 65);
-    else if (!del && txt.length === word.length) t = setTimeout(() => setDel(true), 2400);
-    else if (del && txt.length > 0)              t = setTimeout(() => setTxt(txt.slice(0, -1)), 35);
-    else { setDel(false); setWi(i => (i + 1) % WORDS.length); }
-    return () => clearTimeout(t);
-  }, [txt, del, wi]);
-
-  return (
-    <span style={{ color: C.cyan }}>
-      {txt}<span style={{ borderRight: `2px solid ${C.cyan}`, marginLeft: 2, animation: 'cursor-blink 1s step-end infinite' }} />
-    </span>
-  );
-};
-
-// ─── Counter ──────────────────────────────────────────────────────────────────
-
-const Counter = ({ to, suffix = '' }: { to: number; suffix?: string }) => {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true });
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!inView) return;
-    let s = 0; const step = to / 60;
-    const id = setInterval(() => { s += step; if (s >= to) { setVal(to); clearInterval(id); } else setVal(Math.floor(s)); }, 16);
-    return () => clearInterval(id);
-  }, [inView, to]);
-  return <span ref={ref}>{val}{suffix}</span>;
-};
-
-// ─── Terminal Component ───────────────────────────────────────────────────────
-
-const TERMINAL_LINES = [
-  { t: 0,    color: C.textMuted,  text: '$ agentflow research --goal "AI hiring trends India 2026"' },
-  { t: 600,  color: C.cyan,       text: '▸ Initializing research session...' },
-  { t: 1200, color: C.textMuted,  text: '  Searching: Tavily AI / Google / Bing News' },
-  { t: 1800, color: C.text,       text: '  ✓ Found: TechCrunch India — "TCS announces 40K freshers freeze"' },
-  { t: 2400, color: C.text,       text: '  ✓ Found: Reuters — "Infosys Q2 headcount down 6.3%"' },
-  { t: 3000, color: C.amber,      text: '  ⚡ Premium dataset available: NASSCOM Tech Report 2026' },
-  { t: 3600, color: C.amber,      text: '     Cost: 0.05 USDC  |  Waiting for your approval...' },
-  { t: 4200, color: C.green,      text: '  ✓ You approved. Processing x402 payment via Algorand...' },
-  { t: 4800, color: C.green,      text: '  ✓ Payment settled. Resource unlocked.' },
-  { t: 5400, color: C.cyan,       text: '▸ Synthesizing report from 14 sources...' },
-  { t: 6000, color: C.green,      text: '  ✓ Report ready — 1,847 words, 14 citations' },
-];
-
-const Terminal = () => {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true });
-  const [shown, setShown] = useState(0);
-
-  useEffect(() => {
-    if (!inView) return;
-    const timers = TERMINAL_LINES.map((l, i) =>
-      setTimeout(() => setShown(i + 1), l.t)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, [inView]);
-
-  return (
-    <div ref={ref} style={{
-      background: '#0a0a0a',
-      border: `1px solid ${C.border}`,
-      borderRadius: 16,
-      overflow: 'hidden',
-      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-      fontSize: '0.78rem',
-    }}>
-      {/* Title bar */}
-      <div style={{ background: '#111', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: `1px solid ${C.border}` }}>
-        {['#ef4444','#f59e0b','#22d3ee'].map((c, i) => (
-          <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.8 }} />
-        ))}
-        <span style={{ color: C.textFaint, marginLeft: 8, fontSize: '0.7rem', letterSpacing: '0.05em' }}>agentflow — research agent</span>
-      </div>
-
-      {/* Lines */}
-      <div style={{ padding: '20px 24px', minHeight: 280, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {TERMINAL_LINES.slice(0, shown).map((line, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }}
-            style={{ color: line.color, lineHeight: 1.6, whiteSpace: 'pre' }}
-          >
-            {line.text}
-          </motion.div>
-        ))}
-        {shown < TERMINAL_LINES.length && (
-          <span style={{ color: C.textMuted }}>
-            █<span style={{ animation: 'cursor-blink 0.8s step-end infinite' }} />
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ─── Bento Feature Cards ──────────────────────────────────────────────────────
-
-const BENTO = [
-  {
-    span: '1 / span 2', rowspan: '1', icon: '🔍',
-    title: 'Autonomous web research',
-    desc: 'Give it a question. Gemini AI reads dozens of sources, decides what\'s relevant, discards noise, and synthesises a picture of the truth.',
-    accent: C.cyan, accentDim: C.cyanDim,
-    tag: 'GEMINI AI'
-  },
-  {
-    span: '3', rowspan: '1', icon: '🛡️',
-    title: 'Policy engine',
-    desc: 'Deterministic rules govern every payment. The AI can suggest. Only you can approve.',
-    accent: C.amber, accentDim: C.amberDim,
-    tag: 'SECURE'
-  },
-  {
-    span: '1', rowspan: '1', icon: '⚡',
-    title: 'x402 micro-payments',
-    desc: 'Pay per source, not per month. Algorand USDC settles in seconds.',
-    accent: C.green, accentDim: C.greenDim,
-    tag: 'ALGORAND'
-  },
-  {
-    span: '2 / span 2', rowspan: '1', icon: '📡',
-    title: 'Live event stream',
-    desc: 'Every source found, every decision taken, every cent spent — streamed to your browser the instant it happens.',
-    accent: C.rose, accentDim: C.roseDim,
-    tag: 'REAL-TIME'
-  },
-];
-
-const BentoCard = ({ b, i }: { b: typeof BENTO[0]; i: number }) => {
-  const [hov, setHov] = useState(false);
-  return (
-    <motion.div
-      variants={fade} custom={i}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        gridColumn: b.span,
-        padding: '28px 28px',
-        borderRadius: 18,
-        background: hov ? b.accentDim : C.surface,
-        border: `1px solid ${hov ? b.accent + '40' : C.border}`,
-        transition: 'all 0.35s cubic-bezier(0.22,1,0.36,1)',
-        transform: hov ? 'translateY(-4px)' : 'none',
-        boxShadow: hov ? `0 20px 50px ${b.accent}15` : 'none',
-        cursor: 'default',
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-        <span style={{ fontSize: 28 }}>{b.icon}</span>
-        <span style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.12em', color: b.accent, background: b.accentDim, border: `1px solid ${b.accent}30`, padding: '3px 8px', borderRadius: 99 }}>{b.tag}</span>
-      </div>
-      <h3 style={{ color: C.text, fontWeight: 700, fontSize: '1rem', marginBottom: 10, letterSpacing: '-0.02em', lineHeight: 1.3 }}>{b.title}</h3>
-      <p style={{ color: C.textMuted, fontSize: '0.85rem', lineHeight: 1.75, margin: 0 }}>{b.desc}</p>
-    </motion.div>
-  );
-};
-
-// ─── Marquee ──────────────────────────────────────────────────────────────────
-
-const MARQUEE_ITEMS = ['Gemini AI', 'Algorand Testnet', 'x402 Payments', 'Tavily Search', 'Human-in-the-Loop', 'USDC Micro-payments', 'Real-time SSE', 'Markdown Reports', 'Policy Engine'];
-
-const Marquee = () => (
-  <div style={{ overflow: 'hidden', borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, padding: '14px 0', position: 'relative' }}>
-    <div style={{ display: 'flex', gap: 0, animation: 'marquee 30s linear infinite', width: 'max-content', whiteSpace: 'nowrap' }}>
-      {[...MARQUEE_ITEMS, ...MARQUEE_ITEMS, ...MARQUEE_ITEMS].map((item, i) => (
-        <span key={i} style={{ padding: '0 32px', color: C.textMuted, fontSize: '0.78rem', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ width: 4, height: 4, borderRadius: '50%', background: C.cyan, opacity: 0.6, display: 'inline-block' }} />
-          {item}
-        </span>
-      ))}
-    </div>
-  </div>
-);
-
-// ─── Main Landing ─────────────────────────────────────────────────────────────
-
-export const Landing = () => {
+export const Landing: React.FC = () => {
   const navigate = useNavigate();
-  const { scrollY } = useScroll();
-  const globeY = useTransform(scrollY, [0, 600], [0, 80]);
-  const heroOpacity = useTransform(scrollY, [0, 500], [1, 0]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const toggleMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
   return (
-    <div style={{ background: C.bg, minHeight: '100vh', overflowX: 'hidden', fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", color: C.text }}>
+    <div className="marketing-page">
+      <div className="bg-glow bg-glow-1"></div>
+      <div className="bg-glow bg-glow-2"></div>
 
-      {/* ── Subtle noise texture overlay ── */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', opacity: 0.025, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`, backgroundRepeat: 'repeat', backgroundSize: '200px' }} />
+      <nav className="mk-navbar" id="navbar">
+        <a href="#" className="mk-brand" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
+          <span className="mk-brand-mark">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" stroke="url(#g1)" strokeWidth="1.6" strokeLinejoin="round"/><path d="M12 2V22M3 7L12 12L21 7M3 17L12 12" stroke="url(#g1)" strokeWidth="1.2" strokeLinejoin="round" opacity="0.6"/><defs><linearGradient id="g1" x1="3" y1="2" x2="21" y2="22"><stop stopColor="#8B7CFF"/><stop offset="1" stopColor="#5FA8FF"/></linearGradient></defs></svg>
+          </span>
+          <span className="mk-brand-name">AgentFlow</span>
+        </a>
 
-      {/* ── Dot-grid background ── */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-
-      {/* ── Glow blobs ── */}
-      <div style={{ position: 'fixed', top: '-20%', left: '-10%', width: '60%', height: '60%', zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(circle, rgba(34,211,238,0.07) 0%, transparent 70%)', filter: 'blur(60px)' }} />
-      <div style={{ position: 'fixed', bottom: '-20%', right: '-10%', width: '60%', height: '60%', zIndex: 0, pointerEvents: 'none', background: 'radial-gradient(circle, rgba(245,158,11,0.05) 0%, transparent 70%)', filter: 'blur(80px)' }} />
-
-      {/* ── Navbar ── */}
-      <motion.nav
-        initial={{ y: -64, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2.5rem', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)', background: 'rgba(0,0,0,0.85)', borderBottom: `1px solid ${C.border}` }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: C.cyan, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#000', letterSpacing: '-0.05em' }}>AF</div>
-          <span style={{ fontWeight: 800, fontSize: '0.95rem', letterSpacing: '-0.025em' }}>AgentFlow</span>
-          <span style={{ fontSize: '0.65rem', color: C.textFaint, fontWeight: 600, letterSpacing: '0.08em', marginLeft: 4, border: `1px solid ${C.textFaint}`, borderRadius: 4, padding: '1px 6px' }}>BETA</span>
+        <div className="mk-nav-links" id="navLinks">
+          <a href="#how-it-works">How It Works</a>
+          <a href="#features">Features</a>
+          <a href="#payments">Payments</a>
+          <a href="#why">Why AgentFlow</a>
         </div>
 
-        <nav style={{ display: 'flex', gap: 6 }}>
-          {[['Dashboard', '/'], ['History', '/history'], ['Payments', '/payments']].map(([label, path]) => (
-            <button key={label} onClick={() => navigate(path)}
-              style={{ background: 'transparent', color: C.textMuted, border: 'none', padding: '7px 14px', fontSize: '0.83rem', fontWeight: 500, cursor: 'pointer', borderRadius: 8, transition: 'all 0.2s' }}
-              onMouseEnter={e => { e.currentTarget.style.color = C.text; e.currentTarget.style.background = C.surface; }}
-              onMouseLeave={e => { e.currentTarget.style.color = C.textMuted; e.currentTarget.style.background = 'transparent'; }}
-            >{label}</button>
-          ))}
-          <button onClick={() => navigate('/research/new')}
-            style={{ background: C.cyan, color: '#000', border: 'none', borderRadius: 8, padding: '7px 18px', fontSize: '0.83rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', letterSpacing: '-0.01em' }}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
-          >Start research →</button>
-        </nav>
-      </motion.nav>
+        <div className="mk-nav-actions">
+          <a href="#" className="mk-btn mk-btn-ghost" onClick={(e) => { e.preventDefault(); navigate('/login'); }}>Sign In</a>
+          <a href="#" className="mk-btn mk-btn-primary mk-btn-sm" onClick={(e) => { e.preventDefault(); navigate('/signup'); }}>Get Started</a>
+        </div>
 
-      {/* ── HERO ── */}
-      <section style={{ position: 'relative', height: '100vh', display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', paddingTop: 60, gap: 0, zIndex: 1, maxWidth: 1360, margin: '0 auto', padding: '60px 3rem 0' }}>
-        {/* Left: text */}
-        <motion.div
-          style={{ opacity: heroOpacity }}
-          initial="hidden" animate="show" variants={stagger}
-        >
-          <motion.div variants={fade} custom={0} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: `1px solid ${C.border}`, borderRadius: 999, padding: '5px 14px', marginBottom: 28, fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.1em', color: C.textMuted }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green, display: 'inline-block', boxShadow: `0 0 8px ${C.green}` }} />
-            LIVE RESEARCH AGENT
-          </motion.div>
+        <button className="mk-hamburger" id="hamburger" aria-label="Menu" onClick={toggleMenu}>
+          <span></span><span></span><span></span>
+        </button>
+      </nav>
 
-          <motion.h1 variants={fade} custom={1}
-            style={{ fontSize: 'clamp(3rem, 5.5vw, 4.5rem)', fontWeight: 900, lineHeight: 1.05, letterSpacing: '-0.04em', marginBottom: 24 }}>
-            Research the web.<br />
-            Get <Typewriter />
-          </motion.h1>
-
-          <motion.p variants={fade} custom={2}
-            style={{ color: C.textMuted, fontSize: '1.05rem', lineHeight: 1.8, maxWidth: 440, marginBottom: 40 }}>
-            An autonomous AI agent that finds, evaluates and synthesises research from the open web — and pays for premium data sources only when you approve it.
-          </motion.p>
-
-          <motion.div variants={fade} custom={3} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <button onClick={() => navigate('/research/new')}
-              style={{ background: C.cyan, color: '#000', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.25s', letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 8 }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 12px 36px ${C.cyan}30`; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              Start a research session
-              <span style={{ fontSize: 16 }}>→</span>
-            </button>
-            <button onClick={() => navigate('/')}
-              style={{ background: 'transparent', color: C.text, border: `1px solid ${C.borderStrong}`, borderRadius: 10, padding: '13px 24px', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = C.surface; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-            >View Dashboard</button>
-          </motion.div>
-
-          {/* Social proof line */}
-          <motion.div variants={fade} custom={4} style={{ marginTop: 40, display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ display: 'flex', gap: -8 }}>
-              {['#22d3ee','#f59e0b','#4ade80','#fb7185','#a78bfa'].map((c, i) => (
-                <div key={i} style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: '2px solid #000', marginLeft: i > 0 ? -10 : 0, opacity: 0.85 }} />
-              ))}
-            </div>
-            <span style={{ color: C.textMuted, fontSize: '0.8rem' }}>Built for researchers, analysts & founders</span>
-          </motion.div>
-        </motion.div>
-
-        {/* Right: 3D Globe */}
-        <motion.div
-          style={{ y: globeY, height: 500, position: 'relative' }}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <DataGlobe />
-          {/* Floating annotation cards */}
-          <motion.div
-            animate={{ y: [0, -8, 0] }}
-            transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-            style={{ position: 'absolute', top: '15%', left: '0%', background: 'rgba(0,0,0,0.85)', border: `1px solid ${C.cyan}30`, borderRadius: 12, padding: '10px 14px', backdropFilter: 'blur(12px)', pointerEvents: 'none' }}
-          >
-            <div style={{ fontSize: '0.65rem', color: C.cyan, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>SOURCE FOUND</div>
-            <div style={{ fontSize: '0.78rem', color: C.text, fontWeight: 500 }}>Reuters — Infosys Q2 data</div>
-          </motion.div>
-          <motion.div
-            animate={{ y: [0, 8, 0] }}
-            transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut', delay: 1 }}
-            style={{ position: 'absolute', bottom: '20%', right: '2%', background: 'rgba(0,0,0,0.85)', border: `1px solid ${C.amber}30`, borderRadius: 12, padding: '10px 14px', backdropFilter: 'blur(12px)', pointerEvents: 'none' }}
-          >
-            <div style={{ fontSize: '0.65rem', color: C.amber, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>APPROVAL NEEDED</div>
-            <div style={{ fontSize: '0.78rem', color: C.text, fontWeight: 500 }}>NASSCOM Report — 0.05 USDC</div>
-          </motion.div>
-          <motion.div
-            animate={{ y: [0, -6, 0] }}
-            transition={{ repeat: Infinity, duration: 3.5, ease: 'easeInOut', delay: 2 }}
-            style={{ position: 'absolute', top: '50%', right: '0%', background: 'rgba(0,0,0,0.85)', border: `1px solid ${C.green}30`, borderRadius: 12, padding: '10px 14px', backdropFilter: 'blur(12px)', pointerEvents: 'none' }}
-          >
-            <div style={{ fontSize: '0.65rem', color: C.green, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>PAYMENT SETTLED</div>
-            <div style={{ fontSize: '0.78rem', color: C.text, fontWeight: 500 }}>0.05 USDC · Algorand tx</div>
-          </motion.div>
-        </motion.div>
-      </section>
-
-      {/* ── Marquee ── */}
-      <div style={{ position: 'relative', zIndex: 2, marginTop: 0 }}>
-        <Marquee />
+      <div className={`mk-mobile-menu ${mobileMenuOpen ? 'open' : ''}`} id="mobileMenu">
+        <a href="#how-it-works" onClick={toggleMenu}>How It Works</a>
+        <a href="#features" onClick={toggleMenu}>Features</a>
+        <a href="#payments" onClick={toggleMenu}>Payments</a>
+        <a href="#why" onClick={toggleMenu}>Why AgentFlow</a>
+        <div className="mk-mobile-menu-actions">
+          <a href="#" className="mk-btn mk-btn-ghost" onClick={(e) => { e.preventDefault(); navigate('/login'); }}>Sign In</a>
+          <a href="#" className="mk-btn mk-btn-primary" onClick={(e) => { e.preventDefault(); navigate('/signup'); }}>Get Started</a>
+        </div>
       </div>
 
-      {/* ── STATS ── */}
-      <section style={{ position: 'relative', zIndex: 2, padding: '80px 3rem', maxWidth: 1360, margin: '0 auto' }}>
-        <motion.div
-          initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }}
-          variants={stagger}
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: C.border, borderRadius: 20, overflow: 'hidden' }}
-        >
-          {[
-            { value: 50, suffix: '+', label: 'Sources per session', sub: 'Free + premium data combined' },
-            { value: 100, suffix: '%', label: 'Transparent decisions', sub: 'Every action logged in real time' },
-            { value: 30, suffix: 's', label: 'Time to start', sub: 'Just type your research goal' },
-            { value: 0, suffix: ' clicks', label: 'Needed from you', sub: 'Unless payment approval needed' },
-          ].map((s, i) => (
-            <motion.div key={i} variants={fade} custom={i}
-              style={{ padding: '36px 28px', background: C.bg, textAlign: 'center' }}>
-              <div style={{ fontSize: '2.8rem', fontWeight: 900, color: C.text, letterSpacing: '-0.05em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-                <Counter to={s.value} suffix={s.suffix} />
+      <main id="page-landing">
+        <section className="mk-hero">
+          <div className="mk-hero-inner">
+            <div className="mk-hero-copy">
+              <div className="mk-badge">
+                <span className="mk-badge-dot"></span>
+                AI Research × Autonomous Payments
               </div>
-              <div style={{ color: C.text, fontWeight: 700, fontSize: '0.875rem', marginTop: 12, marginBottom: 4 }}>{s.label}</div>
-              <div style={{ color: C.textMuted, fontSize: '0.78rem', lineHeight: 1.5 }}>{s.sub}</div>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
+              <h1>Your AI Agent for<br/>Research and <span className="mk-grad-text">Autonomous Payments.</span></h1>
+              <p className="mk-hero-sub">AgentFlow researches the web, discovers valuable resources, evaluates paid content, and securely pays for access when you approve.</p>
+              <div className="mk-hero-actions">
+                <a href="#" className="mk-btn mk-btn-primary mk-btn-lg" onClick={(e) => { e.preventDefault(); navigate('/signup'); }}>Start Researching</a>
+                <a href="#how-it-works" className="mk-btn mk-btn-outline mk-btn-lg">See How It Works</a>
+              </div>
+            </div>
 
-      {/* ── BENTO FEATURES ── */}
-      <section style={{ position: 'relative', zIndex: 2, padding: '60px 3rem 100px', maxWidth: 1360, margin: '0 auto' }}>
-        <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }} variants={stagger} style={{ marginBottom: 48, maxWidth: 560 }}>
-          <motion.p variants={fade} style={{ color: C.cyan, fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.14em', marginBottom: 14 }}>WHAT IT DOES</motion.p>
-          <motion.h2 variants={fade} custom={1} style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 900, letterSpacing: '-0.035em', lineHeight: 1.1, marginBottom: 16 }}>
-            An agent that does the work.<br /><span style={{ color: C.textMuted }}>You just ask.</span>
-          </motion.h2>
-          <motion.p variants={fade} custom={2} style={{ color: C.textMuted, lineHeight: 1.7, fontSize: '0.9rem' }}>
-            AgentFlow automates every step of deep research — search, evaluation, payment, synthesis. Built with security and transparency as first principles.
-          </motion.p>
-        </motion.div>
+            <div className="mk-hero-visual">
+              <div className="mk-flow-card">
+                <div className="mk-flow-step" style={{ animationDelay: '0s' }}>
+                  <div className="mk-flow-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3V21M3 12H21" stroke="#8B7CFF" strokeWidth="2" strokeLinecap="round"/></svg>
+                  </div>
+                  <span>Ask</span>
+                </div>
+                <div className="mk-flow-line" style={{ animationDelay: '0.15s' }}></div>
 
-        <motion.div initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} variants={stagger}
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          {BENTO.map((b, i) => <BentoCard key={i} b={b} i={i} />)}
-        </motion.div>
-      </section>
+                <div className="mk-flow-step" style={{ animationDelay: '0.3s' }}>
+                  <div className="mk-flow-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#8B7CFF" strokeWidth="2"/><path d="M21 21L16.65 16.65" stroke="#8B7CFF" strokeWidth="2" strokeLinecap="round"/></svg>
+                  </div>
+                  <span>Research</span>
+                </div>
+                <div className="mk-flow-line" style={{ animationDelay: '0.45s' }}></div>
 
-      {/* ── TERMINAL: HOW IT WORKS ── */}
-      <section style={{ position: 'relative', zIndex: 2, padding: '0 3rem 120px', maxWidth: 1360, margin: '0 auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
-          <div>
-            <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} style={{ color: C.amber, fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.14em', marginBottom: 14 }}>UNDER THE HOOD</motion.p>
-            <motion.h2 initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}
-              style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.8rem)', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 24 }}>
-              Watch the agent think<br /><span style={{ color: C.textMuted }}>in real time</span>
-            </motion.h2>
-            <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.2 }}
-              style={{ color: C.textMuted, lineHeight: 1.75, fontSize: '0.9rem', marginBottom: 28 }}>
-              AgentFlow streams every decision live — what it found, what it skipped, what it wants to buy, and what you approved. You always know what it's doing and why.
-            </motion.p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {[
-                { icon: '🔍', text: 'Searches free web sources', color: C.cyan },
-                { icon: '⚡', text: 'Proposes premium purchases', color: C.amber },
-                { icon: '✅', text: 'Waits for your approval', color: C.green },
-                { icon: '📋', text: 'Writes the final report', color: C.rose },
-              ].map((item, i) => (
-                <motion.div key={i} initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 + 0.3, duration: 0.4 }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.875rem', color: C.textMuted }}>
-                  <span style={{ width: 32, height: 32, borderRadius: 8, background: C.surface, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{item.icon}</span>
-                  <span>{item.text}</span>
-                </motion.div>
-              ))}
+                <div className="mk-flow-step" style={{ animationDelay: '0.6s' }}>
+                  <div className="mk-flow-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 12L9 18L21 6" stroke="#5FA8FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <span>Analyze</span>
+                </div>
+                <div className="mk-flow-line" style={{ animationDelay: '0.75s' }}></div>
+
+                <div className="mk-flow-step highlight" style={{ animationDelay: '0.9s' }}>
+                  <div className="mk-flow-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="10" rx="2" stroke="#FFB84D" strokeWidth="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="#FFB84D" strokeWidth="2"/></svg>
+                  </div>
+                  <span>Payment Required</span>
+                </div>
+                <div className="mk-flow-line" style={{ animationDelay: '1.05s' }}></div>
+
+                <div className="mk-flow-step" style={{ animationDelay: '1.2s' }}>
+                  <div className="mk-flow-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 12L11 14L15 10" stroke="#5FE0A8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#5FE0A8" strokeWidth="2"/></svg>
+                  </div>
+                  <span>Approve</span>
+                </div>
+                <div className="mk-flow-line" style={{ animationDelay: '1.35s' }}></div>
+
+                <div className="mk-flow-step" style={{ animationDelay: '1.5s' }}>
+                  <div className="mk-flow-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" stroke="#8B7CFF" strokeWidth="1.6"/></svg>
+                  </div>
+                  <span>x402 Payment</span>
+                </div>
+                <div className="mk-flow-line" style={{ animationDelay: '1.65s' }}></div>
+
+                <div className="mk-flow-step final" style={{ animationDelay: '1.8s' }}>
+                  <div className="mk-flow-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3L14.5 9.5L21 12L14.5 14.5L12 21L9.5 14.5L3 12L9.5 9.5L12 3Z" stroke="#5FA8FF" strokeWidth="1.6" strokeLinejoin="round"/></svg>
+                  </div>
+                  <span>Discover</span>
+                </div>
+              </div>
             </div>
           </div>
-          <motion.div initial={{ opacity: 0, y: 32 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }}>
-            <Terminal />
-          </motion.div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── CTA ── */}
-      <section style={{ position: 'relative', zIndex: 2, padding: '0 3rem 120px', maxWidth: 1360, margin: '0 auto' }}>
-        <motion.div initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger}
-          style={{ borderRadius: 24, padding: '80px 64px', border: `1px solid ${C.border}`, background: C.surface, position: 'relative', overflow: 'hidden', textAlign: 'center' }}>
-          {/* Background decoration */}
-          <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: '60%', height: '1px', background: `linear-gradient(90deg, transparent, ${C.cyan}, transparent)` }} />
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, height: 400, background: `radial-gradient(circle, ${C.cyanDim} 0%, transparent 70%)`, pointerEvents: 'none', filter: 'blur(40px)' }} />
+        <section className="mk-tech-strip">
+          <div className="mk-tech-strip-inner">
+            <span className="mk-tech-label">Built with</span>
+            <div className="mk-tech-items">
+              <span>AI Agents</span>
+              <span className="dot">•</span>
+              <span>x402</span>
+              <span className="dot">•</span>
+              <span>Algorand</span>
+              <span className="dot">•</span>
+              <span>Secure Payments</span>
+            </div>
+          </div>
+        </section>
 
-          <motion.h2 variants={fade} style={{ fontSize: 'clamp(2rem, 4vw, 3.2rem)', fontWeight: 900, letterSpacing: '-0.04em', marginBottom: 16, position: 'relative' }}>
-            Ready to research smarter?
-          </motion.h2>
-          <motion.p variants={fade} custom={1} style={{ color: C.textMuted, fontSize: '1rem', marginBottom: 40, maxWidth: 460, margin: '0 auto 40px', lineHeight: 1.7, position: 'relative' }}>
-            Public web research is always free. Premium data sources cost a few cents — and only when you say so.
-          </motion.p>
-          <motion.div variants={fade} custom={2} style={{ position: 'relative' }}>
-            <button onClick={() => navigate('/research/new')}
-              style={{ background: C.cyan, color: '#000', border: 'none', borderRadius: 12, padding: '16px 40px', fontSize: '1rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.25s', letterSpacing: '-0.01em' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 16px 48px ${C.cyan}35`; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
-            >
-              Start your first research →
-            </button>
-          </motion.div>
-        </motion.div>
-      </section>
+        <section className="mk-section" id="how-it-works">
+          <div className="mk-section-head">
+            <span className="mk-eyebrow">How It Works</span>
+            <h2>From Question to Answer — Automatically</h2>
+          </div>
+          <div className="mk-steps-grid">
+            <div className="mk-step-card">
+              <span className="mk-step-num">01</span>
+              <h3>Ask</h3>
+              <p>The user gives AgentFlow a research question or topic.</p>
+            </div>
+            <div className="mk-step-connector"></div>
+            <div className="mk-step-card">
+              <span className="mk-step-num">02</span>
+              <h3>Research</h3>
+              <p>The AI agent searches available resources and evaluates their relevance.</p>
+            </div>
+            <div className="mk-step-connector"></div>
+            <div className="mk-step-card">
+              <span className="mk-step-num">03</span>
+              <h3>Approve & Pay</h3>
+              <p>If a valuable resource requires payment, AgentFlow shows the price and asks the user for approval.</p>
+            </div>
+            <div className="mk-step-connector"></div>
+            <div className="mk-step-card">
+              <span className="mk-step-num">04</span>
+              <h3>Discover</h3>
+              <p>After the x402 payment succeeds, AgentFlow accesses the resource and uses the information in the final research.</p>
+            </div>
+          </div>
+        </section>
 
-      {/* ── Footer ── */}
-      <footer style={{ position: 'relative', zIndex: 2, borderTop: `1px solid ${C.border}`, padding: '40px 3rem', maxWidth: 1360, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 22, height: 22, borderRadius: 6, background: C.cyan, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#000' }}>AF</div>
-          <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>AgentFlow</span>
-        </div>
-        <div style={{ display: 'flex', gap: 24, color: C.textMuted, fontSize: '0.78rem' }}>
-          {['Dashboard', 'History', 'Approvals', 'Payments'].map(p => (
-            <button key={p} onClick={() => navigate('/' + p.toLowerCase())}
-              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 'inherit', transition: 'color 0.2s' }}
-              onMouseEnter={e => (e.currentTarget.style.color = C.text)}
-              onMouseLeave={e => (e.currentTarget.style.color = C.textMuted)}
-            >{p}</button>
-          ))}
-        </div>
-        <p style={{ color: C.textFaint, fontSize: '0.75rem' }}>Gemini AI · Algorand · x402</p>
-      </footer>
+        <section className="mk-section" id="features">
+          <div className="mk-section-head">
+            <span className="mk-eyebrow">Features</span>
+            <h2>Built for Agentic Research</h2>
+          </div>
+          <div className="mk-feature-grid">
+            <div className="mk-feature-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2a5 5 0 015 5c0 2-1 3-1 5v2a4 4 0 01-8 0v-2c0-2-1-3-1-5a5 5 0 015-5z" stroke="#8B7CFF" strokeWidth="1.6"/><path d="M9 21h6" stroke="#8B7CFF" strokeWidth="1.6" strokeLinecap="round"/></svg></div>
+              <h3>Autonomous Research</h3>
+              <p>Let AI agents search and evaluate information automatically.</p>
+            </div>
+            <div className="mk-feature-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#5FA8FF" strokeWidth="1.6"/><path d="M21 21L16.65 16.65" stroke="#5FA8FF" strokeWidth="1.6" strokeLinecap="round"/></svg></div>
+              <h3>Smart Resource Discovery</h3>
+              <p>Find valuable resources instead of simply returning search results.</p>
+            </div>
+            <div className="mk-feature-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 12L11 14L15 10" stroke="#5FE0A8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#5FE0A8" strokeWidth="1.6"/></svg></div>
+              <h3>Human-in-the-Loop Payments</h3>
+              <p>The AI can request payment, while the user remains in control.</p>
+            </div>
+            <div className="mk-feature-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" stroke="#FFB84D" strokeWidth="1.6"/></svg></div>
+              <h3>x402 Payments</h3>
+              <p>Enable machine-to-machine payments for paid digital resources.</p>
+            </div>
+            <div className="mk-feature-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14H12L11 22L20 10H12L13 2Z" stroke="#8B7CFF" strokeWidth="1.6" strokeLinejoin="round"/></svg></div>
+              <h3>Algorand Settlement</h3>
+              <p>Fast and efficient blockchain settlement.</p>
+            </div>
+            <div className="mk-feature-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" stroke="#5FA8FF" strokeWidth="1.6"/><circle cx="12" cy="12" r="3" stroke="#5FA8FF" strokeWidth="1.6"/></svg></div>
+              <h3>Transparent Spending</h3>
+              <p>Users can see what the agent wants to purchase, why it needs it, and how much it costs.</p>
+            </div>
+          </div>
+        </section>
 
-      <style>{`
-        @keyframes cursor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-33.33%); } }
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      `}</style>
+        <section className="mk-section" id="payments">
+          <div className="mk-section-head">
+            <span className="mk-eyebrow">Payments</span>
+            <h2>When AI Needs to Pay,<br/>AgentFlow Handles the Flow.</h2>
+          </div>
+
+          <div className="mk-payment-layout">
+            <div className="mk-payment-flow">
+              <div className="mk-pflow-item"><span className="mk-pflow-tag">AI Agent</span></div>
+              <div className="mk-pflow-arrow">→</div>
+              <div className="mk-pflow-item"><span className="mk-pflow-tag">Paid Resource</span></div>
+              <div className="mk-pflow-arrow">→</div>
+              <div className="mk-pflow-item"><span className="mk-pflow-tag">HTTP 402</span></div>
+              <div className="mk-pflow-arrow">→</div>
+              <div className="mk-pflow-item"><span className="mk-pflow-tag">Payment Request</span></div>
+              <div className="mk-pflow-arrow">→</div>
+              <div className="mk-pflow-item"><span className="mk-pflow-tag">User Approval</span></div>
+              <div className="mk-pflow-arrow">→</div>
+              <div className="mk-pflow-item"><span className="mk-pflow-tag">x402 Payment</span></div>
+              <div className="mk-pflow-arrow">→</div>
+              <div className="mk-pflow-item"><span className="mk-pflow-tag">Algorand</span></div>
+              <div className="mk-pflow-arrow">→</div>
+              <div className="mk-pflow-item"><span className="mk-pflow-tag">Resource Access</span></div>
+            </div>
+
+            <div className="mk-approval-card">
+              <div className="mk-approval-card-head">
+                <div className="mk-approval-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="10" rx="2" stroke="#FFB84D" strokeWidth="1.8"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="#FFB84D" strokeWidth="1.8"/></svg>
+                </div>
+                <div>
+                  <h4>Premium Research Report</h4>
+                  <span className="mk-approval-sub">AI Agent found a paid resource</span>
+                </div>
+              </div>
+              <div className="mk-approval-body">
+                <div className="mk-approval-row">
+                  <span className="mk-approval-label">Resource</span>
+                  <span className="mk-approval-value">AI Payments Market Report 2026</span>
+                </div>
+                <div className="mk-approval-row">
+                  <span className="mk-approval-label">Price</span>
+                  <span className="mk-approval-value price">1.00 USDC</span>
+                </div>
+                <div className="mk-approval-row reason">
+                  <span className="mk-approval-label">Reason</span>
+                  <span className="mk-approval-value">This report contains data relevant to your research question.</span>
+                </div>
+              </div>
+              <div className="mk-approval-actions">
+                <button className="mk-btn mk-btn-primary mk-btn-block" type="button">Approve Payment</button>
+                <button className="mk-btn mk-btn-outline mk-btn-block" type="button">Reject</button>
+              </div>
+              <span className="mk-approval-note">Marketing visualization — not a live transaction</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="mk-section" id="why">
+          <div className="mk-section-head">
+            <span className="mk-eyebrow">Why AgentFlow</span>
+            <h2>AI Shouldn't Stop at a Paywall.</h2>
+            <p className="mk-section-desc">Traditional AI agents can discover information but often stop when useful information requires payment. AgentFlow connects research, decision making, user approval, and autonomous payments into one continuous workflow.</p>
+          </div>
+
+          <div className="mk-compare-grid">
+            <div className="mk-compare-card">
+              <span className="mk-compare-tag muted">Traditional AI</span>
+              <ul className="mk-compare-list">
+                <li><span className="mk-ico x">✕</span>Finds free information</li>
+                <li><span className="mk-ico x">✕</span>Stops at paid resources</li>
+                <li><span className="mk-ico x">✕</span>Requires manual purchasing</li>
+                <li><span className="mk-ico x">✕</span>Breaks the workflow</li>
+              </ul>
+            </div>
+            <div className="mk-compare-card highlighted">
+              <span className="mk-compare-tag">AgentFlow</span>
+              <ul className="mk-compare-list">
+                <li><span className="mk-ico check">✓</span>Finds relevant resources</li>
+                <li><span className="mk-ico check">✓</span>Detects paid resources</li>
+                <li><span className="mk-ico check">✓</span>Requests approval</li>
+                <li><span className="mk-ico check">✓</span>Pays through x402</li>
+                <li><span className="mk-ico check">✓</span>Continues the research</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="mk-section" id="security">
+          <div className="mk-section-head">
+            <span className="mk-eyebrow">Security & Control</span>
+            <h2>Autonomous Doesn't Mean Uncontrolled.</h2>
+            <p className="mk-section-desc">AgentFlow keeps you in the loop for every purchase decision the agent makes.</p>
+          </div>
+          <div className="mk-security-grid">
+            <div className="mk-security-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 12L11 14L15 10" stroke="#5FE0A8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#5FE0A8" strokeWidth="1.6"/></svg></div>
+              <h3>User Approval</h3>
+              <p>Every payment requires your explicit confirmation before it executes.</p>
+            </div>
+            <div className="mk-security-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12h16M4 6h16M4 18h10" stroke="#5FA8FF" strokeWidth="1.6" strokeLinecap="round"/></svg></div>
+              <h3>Spending Limits</h3>
+              <p>Set thresholds so the agent never exceeds what you're comfortable with.</p>
+            </div>
+            <div className="mk-security-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" stroke="#8B7CFF" strokeWidth="1.6"/><circle cx="12" cy="12" r="3" stroke="#8B7CFF" strokeWidth="1.6"/></svg></div>
+              <h3>Payment Transparency</h3>
+              <p>See exactly what's being purchased and why, before it happens.</p>
+            </div>
+            <div className="mk-security-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="#FFB84D" strokeWidth="1.6"/><path d="M3 10h18" stroke="#FFB84D" strokeWidth="1.6"/></svg></div>
+              <h3>Transaction History</h3>
+              <p>A complete, auditable record of every payment made on your behalf.</p>
+            </div>
+            <div className="mk-security-card">
+              <div className="mk-feature-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" stroke="#5FA8FF" strokeWidth="1.6"/></svg></div>
+              <h3>Wallet-Based Identity</h3>
+              <p>Your Algorand wallet secures identity and authorization end-to-end.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="mk-final-cta">
+          <div className="mk-final-cta-inner">
+            <h2>Give Your AI Agent the Ability to Pay.</h2>
+            <p>Research beyond paywalls while keeping every payment transparent and under your control.</p>
+            <div className="mk-hero-actions center">
+              <a href="#" className="mk-btn mk-btn-primary mk-btn-lg" onClick={(e) => { e.preventDefault(); navigate('/signup'); }}>Get Started</a>
+              <a href="#" className="mk-btn mk-btn-outline mk-btn-lg" onClick={(e) => { e.preventDefault(); navigate('/login'); }}>Sign In</a>
+            </div>
+          </div>
+        </section>
+
+        <footer className="mk-footer">
+          <div className="mk-footer-inner">
+            <div className="mk-footer-top">
+              <a href="#" className="mk-brand" onClick={(e) => { e.preventDefault(); window.scrollTo(0, 0); }}>
+                <span className="mk-brand-mark">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 2L21 7V17L12 22L3 17V7L12 2Z" stroke="url(#g2)" strokeWidth="1.6" strokeLinejoin="round"/><defs><linearGradient id="g2" x1="3" y1="2" x2="21" y2="22"><stop stopColor="#8B7CFF"/><stop offset="1" stopColor="#5FA8FF"/></linearGradient></defs></svg>
+                </span>
+                <span className="mk-brand-name">AgentFlow</span>
+              </a>
+              <div className="mk-footer-links">
+                <a href="#">Product</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#features">Features</a>
+                <a href="#">Documentation</a>
+                <a href="#">GitHub</a>
+              </div>
+            </div>
+            <div className="mk-footer-bottom">
+              <span>Built for the x402 ecosystem on Algorand.</span>
+              <span>© 2026 AgentFlow</span>
+            </div>
+          </div>
+        </footer>
+      </main>
     </div>
   );
 };

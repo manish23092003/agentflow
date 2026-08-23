@@ -28,26 +28,31 @@ describe('Research API', () => {
   describe('POST /api/v1/research/start', () => {
     it('should create a session and return 201', async () => {
       vi.mocked(ResearchAgent.prototype.runFreeResearchPhase).mockResolvedValue();
+      const validAddress = 'A'.repeat(58);
       const mockSession = {
         id: '123',
         userId: 'default-user',
         goal: 'test goal',
         researchBudget: 200000,
         spent: 0,
+        status: 'STARTED',
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        failureReason: null,
+        report: null,
+        walletAddress: validAddress
       };
       
       vi.mocked(ResearchRepository.prototype.createSession).mockResolvedValue(mockSession as any);
 
       const response = await request(app)
         .post('/api/v1/research/start')
-        .send({ goal: 'test goal', budget: 200000 });
+        .send({ goal: 'test goal', budget: 200000, walletAddress: validAddress });
 
       expect(response.status).toBe(201);
       expect(response.body.id).toBe('123');
       expect(response.body.goal).toBe('test goal');
-      expect(ResearchRepository.prototype.createSession).toHaveBeenCalledWith('default-user', 'test goal', 200000);
+      expect(ResearchRepository.prototype.createSession).toHaveBeenCalledWith('default-user', 'test goal', 200000, validAddress);
     });
 
     it('should return 400 for invalid input', async () => {
@@ -121,7 +126,8 @@ describe('Research API', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           failureReason: null,
-          report: null
+          report: null,
+          walletAddress: null
         });
 
         const req = request(app).get('/api/v1/research/123/stream');

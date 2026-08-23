@@ -5,12 +5,13 @@ import { ResearchState } from '../agent/ResearchStateMachine.js';
 export class ResearchRepository {
   constructor(private db = prisma) {}
 
-  async createSession(userId: string, goal: string, researchBudget: number): Promise<ResearchSession> {
+  async createSession(userId: string, goal: string, researchBudget: number, walletAddress?: string): Promise<ResearchSession> {
     return this.db.researchSession.create({
       data: {
         userId,
         goal,
         researchBudget,
+        walletAddress,
         status: ResearchState.CREATED,
         spent: 0
       }

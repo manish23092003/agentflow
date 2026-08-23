@@ -33,16 +33,37 @@ export class SynthesisService {
       throw new Error('NO_CITATIONS_FOR_SYNTHESIS');
     }
 
+    const citationMap = new Map<string, number>();
+    citations.forEach((c, index) => citationMap.set(c.id, index + 1));
+
     const citationText = citations.map(c => 
-      `[ID: ${c.id}] Title: ${c.title || 'N/A'}\nProvider: ${c.provider}\nSnippet: ${c.snippet || 'N/A'}`
+      `SOURCE [${citationMap.get(c.id)}]:\nTitle: ${c.title || 'N/A'}\nURL: ${c.url || 'N/A'}\nProvider: ${c.provider}\nSnippet: ${c.snippet || 'N/A'}`
     ).join('\n\n');
 
+
     const systemPrompt = `You are a professional research analyst.
-Your job is to synthesize all gathered evidence into a comprehensive final report.
+Your job is to synthesize all gathered evidence into a comprehensive, polished research report.
 The report must answer the user's research goal directly and clearly.
-Format your report in clean Markdown.
-Cite your sources using [ID: <id>] notation corresponding to the provided citations.
-Do not invent any facts not supported by the citations.`;
+
+Format your report using this strict structure:
+# Research Report Title
+## Executive Summary
+## 1. Global Market Size & Revenue Forecast
+## 2. Enterprise Adoption
+## 3. Regional Market Analysis
+## 4. Industry / Sector Analysis
+## 5. Key Growth Drivers
+## 6. Risks / Limitations
+## 7. Key Takeaways
+
+Formatting Rules:
+- Use Markdown tables where useful (e.g. for Market Size or Regional Analysis).
+- Use concise bullet lists for drivers, limitations, and takeaways.
+- Cite your sources using ONLY the provided numeric notation (e.g., [1], [2]).
+- Never invent or fabricate numbers/percentages.
+- Explicitly state when specific data (like yearly breakdowns or regional percentages) is unavailable in the provided evidence.
+- NEVER output UUIDs, internal IDs, session IDs, payment IDs, approval IDs, or backend metadata.
+- Do NOT include a "Sources" section at the end; it will be appended automatically.`;
 
     const userPrompt = `
 Research Goal: "${session.goal}"
@@ -68,11 +89,35 @@ Please write the final synthesis report.
         throw new Error('LLM returned an empty report.');
       }
 
-      const reportText = result.text.trim();
+      let sanitizedReport = result.text.trim();
+
+      // 1. Convert any leaked UUIDs to their mapped number
+      for (const [uuid, index] of citationMap.entries()) {
+        const uuidRegex = new RegExp(uuid, 'gi');
+        sanitizedReport = sanitizedReport.replace(uuidRegex, String(index));
+      }
+
+      // 2. Remove any remaining unknown UUIDs as a final safety net
+      const unknownUuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+      sanitizedReport = sanitizedReport.replace(unknownUuidRegex, '');
+
+      // 3. Clean malformed citation artifacts
+      sanitizedReport = sanitizedReport.replace(/\[\s*\]/g, ''); // empty brackets [] or [ ]
+      sanitizedReport = sanitizedReport.replace(/\[\s*,\s*\]/g, ''); // [,] or [ , ]
+      sanitizedReport = sanitizedReport.replace(/\[\s*,+/g, '[');
+      sanitizedReport = sanitizedReport.replace(/,+\s*\]/g, ']');
+      sanitizedReport = sanitizedReport.replace(/,\s*,/g, ',');
+
+      // 4. Remove LLM generated sources section if it hallucinated one
+      sanitizedReport = sanitizedReport.replace(/(?:^|\n)#{1,3}\s*Sources?[\s\S]*$/i, '');
+
+      // 5. Build authoritative sources section
+      const sourcesList = citations.map(c => `[${citationMap.get(c.id)}] ${c.title || 'N/A'}\n    ${c.url || 'No URL available'}`).join('\n\n');
+      sanitizedReport = `${sanitizedReport.trim()}\n\n### Sources\n\n${sourcesList}`;
 
       // Persist the report using the proper repository method
       // This validates the report is non-empty before saving
-      await this.repository.updateReport(sessionId, reportText);
+      await this.repository.updateReport(sessionId, sanitizedReport);
 
       // Verify the report was actually persisted before transitioning to COMPLETED
       const verifiedSession = await this.repository.getSession(sessionId);

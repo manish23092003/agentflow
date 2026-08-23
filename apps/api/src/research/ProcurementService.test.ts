@@ -55,14 +55,16 @@ describe('ProcurementService', () => {
     };
 
     paymentTool = {
-      fetchResource: vi.fn()
+      fetchResource: vi.fn(),
+      resumePaymentWithSignature: vi.fn()
     };
 
     service = new ProcurementService(researchRepo, paymentRepo, paymentTool);
     vi.clearAllMocks();
+    mockFetch.mockReset();
   });
 
-  const setupFetch402 = (requirement: any = null) => {
+  const setupFetch402 = (requirement: any = {}) => {
     const defaultReq = {
       rawAmount: 100,
       asset: '1',
@@ -71,7 +73,7 @@ describe('ProcurementService', () => {
     };
     mockFetch.mockResolvedValueOnce({
       status: 402,
-      mockRequirement: requirement || defaultReq
+      mockRequirement: { ...defaultReq, ...requirement }
     });
   };
 
@@ -118,7 +120,6 @@ describe('ProcurementService', () => {
   });
 
   it('3. approval resumes same ProcurementService path', async () => {
-    setupFetch402(); // 402 for resume path
     paymentRepo.getApprovalRequest.mockResolvedValueOnce({
       id: 'app-1',
       paymentRecordId: 'pr-1',
@@ -135,14 +136,14 @@ describe('ProcurementService', () => {
       timestamp: new Date().toISOString()
     });
 
-    paymentTool.fetchResource.mockResolvedValueOnce({
-      data: 'secret data',
-      metadata: { transactionId: 'tx-1' }
-    });
+    paymentTool.resumePaymentWithSignature.mockResolvedValueOnce('secret data');
 
-    const res = await service.resumeApproval('app-1', mockPolicy as any);
+    const res = await service.resumeApproval('app-1', mockPolicy as any, 'mock-signed-txn');
     expect(res.status).toBe('SUCCESS');
-    expect(paymentTool.fetchResource).toHaveBeenCalled();
+    expect(paymentTool.resumePaymentWithSignature).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'app-1', resourceUrl: 'http://test.com/resource' }),
+      'mock-signed-txn'
+    );
     expect(researchRepo.updateSpent).toHaveBeenCalledWith('session-1', 100);
   });
 
@@ -156,6 +157,7 @@ describe('ProcurementService', () => {
   it('5. stale amount rejects', async () => {
     setupFetch402({ rawAmount: 200, asset: '1', network: 'testnet' });
     const res = await service.executeProcurement('session-1', 'rec-1', mockPolicy as any);
+    console.log('TEST 5 RES:', res);
     expect(res.status).toBe('ALTERNATIVE_REQUIRED');
     expect(paymentTool.fetchResource).not.toHaveBeenCalled();
   });

@@ -31,7 +31,21 @@ export interface AppConfig {
     sessionCookieName: string;
     sessionDurationMs: number;
     googleClientId?: string;
+    googleClientSecret?: string;
+    googleRedirectUri?: string;
   };
+  frontendUrl?: string;
+}
+
+const isProd = process.env.NODE_ENV === 'production';
+
+function requireEnv(key: string, devFallback: string): string {
+  const val = process.env[key];
+  if (val) return val;
+  if (isProd) {
+    throw new Error(`${key} environment variable is required in production.`);
+  }
+  return devFallback;
 }
 
 export const config: AppConfig = {
@@ -49,7 +63,7 @@ export const config: AppConfig = {
   geminiModel: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
   tavilyApiKey: process.env.TAVILY_API_KEY,
   demoMode: process.env.AGENTFLOW_DEMO_MODE === 'true',
-  demoPaidResourceUrl: process.env.DEMO_PAID_RESOURCE_URL || 'http://localhost:3002/research/premium',
+  demoPaidResourceUrl: requireEnv('DEMO_PAID_RESOURCE_URL', 'http://localhost:3002/research/premium'),
   x402: {
     facilitatorUrl: process.env.X402_FACILITATOR_URL || 'https://facilitator.goplausible.xyz/',
     network: `algorand:${process.env.ALGORAND_NETWORK || 'testnet'}`
@@ -60,6 +74,9 @@ export const config: AppConfig = {
   auth: {
     sessionCookieName: process.env.SESSION_COOKIE_NAME || 'agentflow_session',
     sessionDurationMs: parseInt(process.env.SESSION_DURATION_MS || String(7 * 24 * 60 * 60 * 1000), 10),
-    googleClientId: process.env.GOOGLE_CLIENT_ID
-  }
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    googleRedirectUri: requireEnv('GOOGLE_REDIRECT_URI', 'http://localhost:3001/api/v1/auth/google/callback')
+  },
+  frontendUrl: requireEnv('FRONTEND_URL', 'http://localhost:5173')
 };

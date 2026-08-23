@@ -2,11 +2,13 @@ import React from 'react';
 import { api } from '../../lib/api';
 import { Loader2, Wallet, ExternalLink, ShieldCheck } from 'lucide-react';
 import { useWallet } from '../../context/WalletContext';
+import { ApprovalRequest } from '../../types/research';
+import algosdk from 'algosdk';
 
 export type ApprovalState = 'PENDING' | 'APPROVING' | 'REJECTING' | 'APPROVED' | 'REJECTED' | 'STALE' | 'FAILED';
 
 interface ApprovalActionsProps {
-  approvalId: string;
+  approval: ApprovalRequest;
   currentState: ApprovalState;
   costDisplay?: string;
   onStateChange: (state: ApprovalState) => void;
@@ -14,27 +16,51 @@ interface ApprovalActionsProps {
 }
 
 export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
-  approvalId,
+  approval,
   currentState,
   costDisplay,
   onStateChange,
   onError
 }) => {
   const [transactionId, setTransactionId] = React.useState<string | null>(null);
-  const { isConnected, shortAddress } = useWallet();
+  const { isConnected, shortAddress, address, signTransactions } = useWallet();
   const isPending = currentState === 'PENDING';
   const isWorking = currentState === 'APPROVING' || currentState === 'REJECTING';
 
   const handleApprove = async () => {
     if (!isPending) return;
-    if (!isConnected) {
+    if (!isConnected || !address) {
       onError('Please connect your Pera Wallet before approving payment.');
       return;
     }
 
     onStateChange('APPROVING');
     try {
-      const res = await api.approve(approvalId);
+      // Construct Algorand Transaction using TestNet Algod
+      const algodClient = new algosdk.Algodv2('', 'https://testnet-api.algonode.cloud', '');
+      const req = algodClient.getTransactionParams();
+      const sp = await req.do();
+
+      const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+        sender: address,
+        receiver: approval.payTo,
+        amount: approval.amount,
+        assetIndex: Number(approval.asset),
+        note: new Uint8Array(Array.from(`x402-payment-v1-${Date.now()}`).map(c => c.charCodeAt(0))),
+        suggestedParams: sp
+      });
+
+      const txnsToSign = [{ txn, signers: [address] }];
+      const signedTxns = await signTransactions([txnsToSign]);
+      
+      let binary = '';
+      const bytes = new Uint8Array(signedTxns[0]);
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const signedTxnBase64 = btoa(binary);
+
+      const res = await api.approve(approval.id, signedTxnBase64, address);
       if (res.status === 'SUCCESS') {
         if (res.payload?.transactionId) {
           setTransactionId(res.payload.transactionId);
@@ -45,13 +71,16 @@ export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
         onError(res.reason || 'The purchase could not be approved. Please try again.');
       }
     } catch (err: unknown) {
+      if (err instanceof Error) console.error('APPROVAL ERROR STACK:', err.stack);
+      console.error('APPROVAL ERROR TRACE:', err);
       const message = err instanceof Error ? err.message : String(err);
+      console.error('Approval Error:', err);
       if (message.includes('expired') || message.includes('stale')) {
         onStateChange('STALE');
         onError('This request has expired. The agent will automatically look for an alternative source.');
       } else {
         onStateChange('FAILED');
-        onError('Something went wrong while processing the approval. Please try again.');
+        onError(`Payment signing or processing failed: ${message}`);
       }
     }
   };
@@ -60,7 +89,7 @@ export const ApprovalActions: React.FC<ApprovalActionsProps> = ({
     if (!isPending) return;
     onStateChange('REJECTING');
     try {
-      const res = await api.reject(approvalId);
+      const res = await api.reject(approval.id);
       if (res.status === 'REJECTED') {
         onStateChange('REJECTED');
       } else {

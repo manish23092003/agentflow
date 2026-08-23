@@ -50,17 +50,18 @@ export class GapAnalysisService {
 Your objective is to determine if the collected free public web search results leave a MATERIAL GAP compared to the user's explicit research goal.
 
 EVALUATION CRITERIA:
-1. Distinguish between public web search snippets and dedicated, authoritative machine-readable API payloads:
-   - Web search engine snippets (from Tavily, Google, etc.) are third-party text/HTML excerpts scraped from public websites. They do NOT constitute an authoritative, verifiable, direct API payload or complete machine-readable service stream.
-   - If the user's goal explicitly asks for machine-readable weather API data, structured short-term forecasts, quantitative datasets, or proprietary market intelligence:
-     * Free web snippets containing partial text or scraped HTML excerpts do NOT satisfy the requirement for authoritative structured API data and complete forecast models.
-     * Truncated JSON snippets in web search previews lack complete multi-hour/multi-day forecast arrays, authenticated API provenance, and verifiable data service outputs.
-   - Therefore, when the user has allocated a research budget and explicitly requested machine-readable API data, structured forecast datasets, or proprietary intelligence:
-     * hasMaterialGap = true
-     * importance = "HIGH"
-     * recommendedAction = "DISCOVER_PAID"
-     * missingInformation = list of specific missing structured API fields / forecast datasets (e.g. ["Authoritative structured API weather data service stream", "Complete structured short-term forecast array"]).
-2. Only when the research goal is general informational lookups that do NOT request structured API data, proprietary datasets, or granular forecasts should hasMaterialGap be false.`;
+1. Identify if the user's goal requires advanced, premium, or structured information that typical free web articles lack. Examples include:
+   - Proprietary data or analyst intelligence
+   - Detailed market forecasts (e.g., revenue forecasts, market share by region)
+   - Enterprise adoption metrics or sponsor-level data
+   - Quantitative datasets (historical + forecast datasets)
+   - Deep industry reports or paid research reports
+   - Structured machine-readable API payloads (like weather data streams)
+2. If the user's goal falls into one of these categories (e.g., requests detailed market sizing, quantitative projections, or proprietary intelligence):
+   - Evaluate whether the free search snippets actually provide this exact data, or if they only provide general summaries, SEO articles, or secondary commentary.
+   - If the free sources lack the specific quantitative or proprietary details requested, then a material gap exists.
+   - Set hasMaterialGap = true, importance = "HIGH", recommendedAction = "DISCOVER_PAID", and clearly list the missing premium details in missingInformation.
+3. If the user's goal is a general informational lookup (e.g., "What are AI agents?") OR if the free sources actually contain sufficient data to fully answer the request, then set hasMaterialGap = false.`;
 
     const llmProvider = new GeminiProvider(config.geminiApiKey, config.geminiModel);
     const model = llmProvider.getModel();
@@ -82,9 +83,9 @@ ${citationText}
 
 Evaluate whether the collected free public search snippets fully satisfy all explicit requirements in "${session.goal}".
 Specifically verify:
-1. Does the evidence provide an authoritative, direct machine-readable API data payload, or merely third-party scraped web search snippets?
-2. Is the requested structured short-term forecast array present in the free search results?
-If explicit machine-readable API or structured forecast requirements remain unmet by free sources, report hasMaterialGap: true, importance: "HIGH", and recommendedAction: "DISCOVER_PAID".`
+1. Does the evidence provide the actual requested quantitative datasets, forecasts, market intelligence, or API payloads, or merely general third-party text excerpts?
+2. If the goal requires specific numbers, datasets, structured data, or proprietary intelligence, is that fully present in the free search results?
+If explicit data, forecast, or proprietary intelligence requirements remain unmet by free sources, report hasMaterialGap: true, importance: "HIGH", and recommendedAction: "DISCOVER_PAID".`
           }
         ]
       });
@@ -110,6 +111,16 @@ If explicit machine-readable API or structured forecast requirements remain unme
         evidenceCitationIds: JSON.stringify(gap.evidenceCitationIds)
       });
       
+      console.log('--- TEMPORARY RESEARCH DIAGNOSTICS: GAP ANALYSIS ---');
+      console.log('Session ID:', sessionId);
+      console.log('Goal:', session.goal);
+      console.log('gapAnalysis.materialGap:', gap.hasMaterialGap);
+      console.log('gapAnalysis.importance:', gap.importance);
+      console.log('gapAnalysis.recommendedAction:', gap.recommendedAction);
+      console.log('gapAnalysis.missingInformation:', gap.missingInformation);
+      console.log('gapAnalysis.evidenceSummary:', gap.evidenceSummary);
+      console.log('----------------------------------------------------');
+
       researchEvents.emitAgentAction(sessionId, 'GAP_ANALYSIS_COMPLETED', `Material gap: ${gap.hasMaterialGap}. Next: ${gap.recommendedAction}`);
 
       // App logic dictates state transition

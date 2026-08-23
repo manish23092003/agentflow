@@ -17,7 +17,8 @@ class DummyDiscoveryProvider implements ServiceDiscoveryProvider {
         priceUsdc: 0.1,
         asset: '12345',
         network: 'net1',
-        paymentScheme: 'exact'
+        paymentScheme: 'exact',
+        payTo: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ'
       }
     ];
   }

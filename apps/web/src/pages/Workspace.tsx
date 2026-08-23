@@ -22,15 +22,14 @@ export const Workspace = () => {
   const fetchSession = useCallback(async (): Promise<void> => {
     if (!id) return;
     try {
-      const res = await fetch(`/api/v1/research/${id}`);
-      if (!res.ok) {
-        if (res.status === 404) throw new Error('NOT_FOUND');
-        throw new Error('Failed to load this research session.');
-      }
-      const data = await res.json();
+      const data = await api.getSession(id);
       setSession(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch (err: unknown) {
+      if (err instanceof Error && (err.message === 'NOT_FOUND' || err.message.includes('404'))) {
+        setError('NOT_FOUND');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load this research session.');
+      }
     }
   }, [id]);
 
@@ -39,20 +38,11 @@ export const Workspace = () => {
     let mounted = true;
     const hydrate = async () => {
       try {
-        const [sessionRes, citationsRes, paymentsRes] = await Promise.all([
-          fetch(`/api/v1/research/${id}`),
-          fetch(`/api/v1/research/${id}/citations`),
-          fetch(`/api/v1/research/${id}/payments`)
+        const [sessionData, citationsData, paymentsData] = await Promise.all([
+          api.getSession(id),
+          api.getCitations(id).catch(() => []),
+          api.getSessionPayments(id).catch(() => [])
         ]);
-
-        if (!sessionRes.ok) {
-          if (sessionRes.status === 404) throw new Error('NOT_FOUND');
-          throw new Error('Failed to load this research session.');
-        }
-
-        const sessionData = await sessionRes.json();
-        const citationsData = citationsRes.ok ? await citationsRes.json() : [];
-        const paymentsData = paymentsRes.ok ? await paymentsRes.json() : [];
 
         if (mounted) {
           setSession(sessionData);
@@ -174,13 +164,16 @@ export const Workspace = () => {
     } else if (e.type === 'research_completed') {
       label = 'Research complete';
     } else if (e.type === 'payment_started') {
-      label = 'Processing payment';
+      label = 'Executing x402 payment...';
     } else if (e.type === 'payment_settled') {
-      label = 'Payment confirmed';
+      label = '✓ Payment confirmed';
+      sub = e.data.transactionId ? `Transaction: ${e.data.transactionId}` : '';
     } else if (e.type === 'service_discovered') {
       label = 'Discovered premium resource';
     } else if (e.type === 'service_evaluated') {
-      label = 'Evaluated candidate resources';
+      const decision = e.data.isEligible ? 'PURCHASE' : 'SKIP';
+      label = `Decision: ${decision}`;
+      sub = `Reason: ${e.data.reason}`;
     } else if (e.type === 'agent_action') {
       label = e.data.action || 'Agent working';
       sub = e.data.details || '';

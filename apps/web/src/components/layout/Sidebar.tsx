@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Plus, History, ShieldAlert, CreditCard } from 'lucide-react';
 
 const PRIMARY = [
-  { name: 'Dashboard',    path: '/',             icon: LayoutDashboard, end: true },
+  { name: 'Dashboard',    path: '/dashboard',             icon: LayoutDashboard, end: true },
   { name: 'New Research', path: '/research/new', icon: Plus,            end: false },
 ];
 
@@ -54,6 +54,8 @@ export const Sidebar = () => {
       </div>
 
       <div className="sidebar-spacer"></div>
+
+
 
       <div className="env-badge">
         <span className="env-dot"></span>

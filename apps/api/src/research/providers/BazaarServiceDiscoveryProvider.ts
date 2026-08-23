@@ -44,6 +44,7 @@ export class BazaarServiceDiscoveryProvider implements ServiceDiscoveryProvider 
         asset: this.usdcAssetId,
         network: 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=',
         paymentScheme: 'exact',
+        payTo: 'NLWHCGS5Q5GEQYV3PCJGQPZ5PK7JBDJBKJBI2W2ZFYGV6YEOHCE5RJVLJU',
         source: 'x402-demo-fixture',
         capabilities: ['quantitative projections', 'market sizing', 'revenue forecasts', 'enterprise adoption']
       };

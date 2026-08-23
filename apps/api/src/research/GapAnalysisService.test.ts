@@ -108,6 +108,86 @@ describe('GapAnalysisService', () => {
     expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.SYNTHESIZING);
   });
 
+  // User Requested Tests:
+  it('TEST 1: General question should result in materialGap=false and transition to SYNTHESIZING', async () => {
+    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.EVALUATING_GAPS, goal: 'What are AI agents?' });
+    repository.getCitationsBySessionId.mockResolvedValue([{ id: 'c1', title: 'test', snippet: 'test' }]);
+    
+    vi.mocked(generateObject).mockResolvedValue({
+      object: {
+        hasMaterialGap: false,
+        missingInformation: [],
+        importance: 'LOW',
+        evidenceSummary: 'General info is sufficient',
+        recommendedAction: 'CONTINUE_FREE',
+        evidenceCitationIds: ['c1']
+      }
+    } as any);
+
+    await service.evaluateGaps('1');
+    expect(repository.createGap).toHaveBeenCalledWith(expect.objectContaining({ hasMaterialGap: false }));
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.SYNTHESIZING);
+  });
+
+  it('TEST 2: Quantitative market research should result in materialGap=true and transition to PAID_DISCOVERY', async () => {
+    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.EVALUATING_GAPS, goal: 'Global AI Agent Market Size, Revenue Forecast, Enterprise Adoption and Market Share by Region 2026–2030' });
+    repository.getCitationsBySessionId.mockResolvedValue([{ id: 'c1', title: 'general article', snippet: 'some general text' }]);
+    
+    vi.mocked(generateObject).mockResolvedValue({
+      object: {
+        hasMaterialGap: true,
+        missingInformation: ['quantitative dataset', 'revenue forecast'],
+        importance: 'HIGH',
+        evidenceSummary: 'Missing detailed forecasts',
+        recommendedAction: 'DISCOVER_PAID',
+        evidenceCitationIds: ['c1']
+      }
+    } as any);
+
+    await service.evaluateGaps('1');
+    expect(repository.createGap).toHaveBeenCalledWith(expect.objectContaining({ hasMaterialGap: true, importance: 'HIGH' }));
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.PAID_DISCOVERY);
+  });
+
+  it('TEST 3: Explicit proprietary requirement should result in materialGap=true and transition to PAID_DISCOVERY', async () => {
+    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.EVALUATING_GAPS, goal: 'Find proprietary analyst data for AI agent market revenue forecasts through 2030.' });
+    repository.getCitationsBySessionId.mockResolvedValue([{ id: 'c1', title: 'test', snippet: 'test' }]);
+    
+    vi.mocked(generateObject).mockResolvedValue({
+      object: {
+        hasMaterialGap: true,
+        missingInformation: ['proprietary analyst data'],
+        importance: 'HIGH',
+        evidenceSummary: 'Missing analyst data',
+        recommendedAction: 'DISCOVER_PAID',
+        evidenceCitationIds: ['c1']
+      }
+    } as any);
+
+    await service.evaluateGaps('1');
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.PAID_DISCOVERY);
+  });
+
+  it('TEST 4: Free sources contain sufficient information should result in materialGap=false', async () => {
+    repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.EVALUATING_GAPS, goal: 'Global AI Agent Market Size 2024' });
+    repository.getCitationsBySessionId.mockResolvedValue([{ id: 'c1', title: 'Market Report 2024', snippet: 'The market size is $5B' }]);
+    
+    vi.mocked(generateObject).mockResolvedValue({
+      object: {
+        hasMaterialGap: false,
+        missingInformation: [],
+        importance: 'LOW',
+        evidenceSummary: 'Data was found in free sources',
+        recommendedAction: 'CONTINUE_FREE',
+        evidenceCitationIds: ['c1']
+      }
+    } as any);
+
+    await service.evaluateGaps('1');
+    expect(repository.createGap).toHaveBeenCalledWith(expect.objectContaining({ hasMaterialGap: false }));
+    expect(repository.updateStatus).toHaveBeenCalledWith('1', ResearchState.SYNTHESIZING);
+  });
+
   it('should safely fail if zero citations are available', async () => {
     repository.getSession.mockResolvedValue({ id: '1', status: ResearchState.EVALUATING_GAPS, goal: 'test' });
     repository.getCitationsBySessionId.mockResolvedValue([]);

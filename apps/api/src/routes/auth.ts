@@ -19,10 +19,6 @@ const LoginSchema = z.object({
   password: z.string().min(1, 'Password is required')
 });
 
-const GoogleAuthSchema = z.object({
-  credential: z.string().min(1, 'Google credential is required')
-});
-
 const WalletNonceSchema = z.object({
   address: z.string().min(58, 'Invalid Algorand address').max(58, 'Invalid Algorand address')
 });
@@ -38,7 +34,7 @@ function setSessionCookie(res: any, rawToken: string, expiresAt: Date) {
   res.cookie(config.auth.sessionCookieName, rawToken, {
     httpOnly: true,
     secure: config.env === 'production',
-    sameSite: 'lax',
+    sameSite: config.env === 'production' ? 'none' : 'lax',
     expires: expiresAt,
     path: '/'
   });
@@ -101,30 +97,46 @@ authRouter.post('/login', async (req, res) => {
 });
 
 /**
- * POST /api/v1/auth/google
+ * GET /api/v1/auth/google
  */
-authRouter.post('/google', async (req, res) => {
+authRouter.get('/google', (req, res) => {
   try {
-    const data = GoogleAuthSchema.parse(req.body);
-    const user = await authService.googleAuth(data.credential);
+    const url = authService.getGoogleAuthUrl();
+    res.redirect(url);
+  } catch {
+    res.redirect(`${config.frontendUrl}/login?error=oauth_configuration`);
+  }
+});
+
+/**
+ * GET /api/v1/auth/google/callback
+ */
+authRouter.get('/google/callback', async (req, res) => {
+  try {
+    const error = req.query.error as string;
+    if (error === 'access_denied') {
+      res.redirect(`${config.frontendUrl}/login?error=oauth_denied`);
+      return;
+    }
+    if (error) {
+      res.redirect(`${config.frontendUrl}/login?error=oauth_failed`);
+      return;
+    }
+
+    const code = req.query.code as string;
+    if (!code) {
+      res.redirect(`${config.frontendUrl}/login?error=oauth_failed`);
+      return;
+    }
+
+    const user = await authService.handleGoogleCallback(code);
     const { rawToken, expiresAt } = await authService.createSession(user.id);
 
     setSessionCookie(res, rawToken, expiresAt);
 
-    const profile = await authService.getUserProfile(user.id);
-    res.json({
-      success: true,
-      user: profile,
-      wallets: profile?.wallets || []
-    });
-  } catch (error: any) {
-    res.status(400).json({
-      success: false,
-      error: {
-        code: 'GOOGLE_AUTH_FAILED',
-        message: error.message || 'Failed to authenticate with Google'
-      }
-    });
+    res.redirect(`${config.frontendUrl}/dashboard`);
+  } catch {
+    res.redirect(`${config.frontendUrl}/login?error=oauth_failed`);
   }
 });
 

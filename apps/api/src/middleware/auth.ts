@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
-import { prisma } from '../db/prisma.js';
+import { AuthService } from '../services/AuthService.js';
+import { config } from '../config.js';
 import type { User } from '@prisma/client';
 
 /* eslint-disable @typescript-eslint/no-namespace */
@@ -12,34 +13,39 @@ declare global {
 }
 /* eslint-enable @typescript-eslint/no-namespace */
 
-/**
- * Gets or creates a default local user to bypass authentication.
- */
-async function getOrCreateDefaultUser(): Promise<User> {
-  const email = 'local_user@agentflow.dev';
-  let user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        email,
-        name: 'Local User',
-        passwordHash: 'none',
-      }
-    });
+const authService = new AuthService();
+
+function extractToken(req: Request): string | undefined {
+  let token: string | undefined = req.cookies?.[config.auth.sessionCookieName];
+  if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+    token = req.headers.authorization.substring(7).trim();
   }
-  return user;
+  return token;
 }
 
 /**
- * Middleware that automatically attaches the default user to the request.
+ * Middleware that strictly requires authentication.
+ * Returns 401 Unauthorized if missing or invalid.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     if (req.user) {
-      next();
+      return next();
+    }
+    
+    const token = extractToken(req);
+    if (!token) {
+      res.status(401).json({ success: false, error: { message: 'Authentication required' } });
       return;
     }
-    req.user = await getOrCreateDefaultUser();
+
+    const user = await authService.validateSession(token);
+    if (!user) {
+      res.status(401).json({ success: false, error: { message: 'Invalid or expired session' } });
+      return;
+    }
+
+    req.user = user;
     next();
   } catch (error) {
     next(error);
@@ -47,15 +53,23 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 /**
- * Middleware that automatically attaches the default user to the request.
+ * Middleware that optionally checks for authentication.
+ * Never throws 401; simply leaves req.user undefined if no valid session.
  */
 export async function optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     if (req.user) {
-      next();
-      return;
+      return next();
     }
-    req.user = await getOrCreateDefaultUser();
+    
+    const token = extractToken(req);
+    if (token) {
+      const user = await authService.validateSession(token);
+      if (user) {
+        req.user = user;
+      }
+    }
+    
     next();
   } catch (error) {
     next(error);
