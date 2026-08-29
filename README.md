@@ -231,12 +231,6 @@ To deploy AgentFlow to production, you will need:
 
 AgentFlow was built around the conceptual x402 payment protocol. It demonstrates a concrete implementation of how AI agents can interact with the machine-readable web to access, evaluate, and purchase paid digital resources frictionlessly using crypto networks. 
 
-## 📸 Demo
-
-## Demo
-
-*(Add demo video / screenshots / live URL here)*
-
 ## 🗺️ Future Improvements
 
 - Algorand MainNet support
