@@ -7,7 +7,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { GoogleLoginButton } from '../components/auth/GoogleLoginButton';
 import { api, API_BASE } from '../lib/api';
 
-describe('GoogleLoginButton & Server Wakeup Flow', () => {
+describe('GoogleLoginButton & Server Wakeup Flow (Redesigned SaaS UI)', () => {
   const originalLocation = window.location;
 
   beforeEach(() => {
@@ -35,7 +35,7 @@ describe('GoogleLoginButton & Server Wakeup Flow', () => {
     expect(button).not.toBeDisabled();
   });
 
-  it('Scenario 1: Backend already awake — shows loading UI and redirects to Google OAuth when ready', async () => {
+  it('Scenario 1: Backend already awake — shows clean loading modal and redirects to Google OAuth when ready', async () => {
     let resolveHealth!: (val: boolean) => void;
     vi.spyOn(api, 'checkHealth').mockImplementation(
       () => new Promise((resolve) => { resolveHealth = resolve; })
@@ -44,33 +44,33 @@ describe('GoogleLoginButton & Server Wakeup Flow', () => {
     render(<GoogleLoginButton />);
     const button = screen.getByRole('button', { name: /continue with google/i });
 
-    // Click button
     await act(async () => {
       fireEvent.click(button);
     });
 
-    // In-app loading modal should be displayed
+    // In-app loading modal should be displayed with clean plain-language copy
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText(/connecting securely/i)).toBeInTheDocument();
+    expect(screen.getByText('Getting things ready')).toBeInTheDocument();
+    expect(screen.getByText('This may take a moment. Thanks for your patience.')).toBeInTheDocument();
+    expect(screen.getByText(/signing in securely with google/i)).toBeInTheDocument();
 
     // Health check resolves healthy
     await act(async () => {
       resolveHealth(true);
     });
 
-    // Should indicate ready status
-    expect(screen.getByText(/backend is ready/i)).toBeInTheDocument();
+    // Short visual state before redirect
+    expect(screen.getByText(/redirecting to google\.\.\./i)).toBeInTheDocument();
 
-    // Advance past the 400ms redirect timeout
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(400);
     });
 
     // Verify redirection to Google OAuth endpoint
     expect(window.location.href).toBe(`${API_BASE}/auth/google`);
   });
 
-  it('Scenario 2: Backend asleep — stays on domain, updates elapsed time & message, redirects when ready', async () => {
+  it('Scenario 2: Backend asleep — stays on domain, displays discreet elapsed time without tech jargon, redirects when ready', async () => {
     const healthPromises: Array<(val: boolean) => void> = [];
     vi.spyOn(api, 'checkHealth').mockImplementation(
       () => new Promise((resolve) => { healthPromises.push(resolve); })
@@ -86,13 +86,14 @@ describe('GoogleLoginButton & Server Wakeup Flow', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(window.location.href).toBe('http://localhost:5173/login'); // Remains on frontend!
 
-    // Advance timer by 8 seconds (transition to waking state)
+    // Advance timer by 8 seconds (discreet elapsed counter)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(8000);
     });
 
-    expect(screen.getByText(/waking up cloud server/i)).toBeInTheDocument();
-    expect(screen.getByText(/connecting \(8s\)/i)).toBeInTheDocument();
+    expect(screen.getByText('Getting things ready')).toBeInTheDocument();
+    expect(screen.getByText('This may take a moment. Thanks for your patience.')).toBeInTheDocument();
+    expect(screen.getByText(/\(8s\)/i)).toBeInTheDocument();
 
     // First ping finishes false (server still booting)
     await act(async () => {
@@ -109,18 +110,16 @@ describe('GoogleLoginButton & Server Wakeup Flow', () => {
       if (healthPromises[1]) healthPromises[1](true);
     });
 
-    // Successfully transitioned to ready
-    expect(screen.getByText(/backend is ready/i)).toBeInTheDocument();
+    expect(screen.getByText(/redirecting to google\.\.\./i)).toBeInTheDocument();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(400);
     });
 
     expect(window.location.href).toBe(`${API_BASE}/auth/google`);
   });
 
-  it('Scenario 3: Backend unavailable / timeout — shows error and allows dismiss', async () => {
-    // Health check always fails with false
+  it('Scenario 3: Backend unavailable / timeout — shows "We couldn\'t connect" and allows cancel/dismiss', async () => {
     vi.spyOn(api, 'checkHealth').mockResolvedValue(false);
 
     render(<GoogleLoginButton />);
@@ -135,16 +134,17 @@ describe('GoogleLoginButton & Server Wakeup Flow', () => {
       await vi.advanceTimersByTimeAsync(95000);
     });
 
-    // Error UI should appear
-    expect(screen.getByText(/connection timed out/i)).toBeInTheDocument();
-    const retryBtn = screen.getByRole('button', { name: /retry connection/i });
-    const dismissBtn = screen.getByRole('button', { name: /dismiss/i });
+    // Clean error UI with specified plain language
+    expect(screen.getByText("We couldn't connect")).toBeInTheDocument();
+    expect(screen.getByText('Please check your connection and try again.')).toBeInTheDocument();
+    const retryBtn = screen.getByRole('button', { name: 'Try again' });
+    const cancelBtn = screen.getByRole('button', { name: 'Cancel' });
     expect(retryBtn).toBeInTheDocument();
-    expect(dismissBtn).toBeInTheDocument();
+    expect(cancelBtn).toBeInTheDocument();
 
-    // Clicking dismiss cancels and restores the button
+    // Clicking cancel dismisses and restores the button
     await act(async () => {
-      fireEvent.click(dismissBtn);
+      fireEvent.click(cancelBtn);
     });
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -167,7 +167,7 @@ describe('GoogleLoginButton & Server Wakeup Flow', () => {
       await vi.advanceTimersByTimeAsync(95000);
     });
 
-    expect(screen.getByText(/connection timed out/i)).toBeInTheDocument();
+    expect(screen.getByText("We couldn't connect")).toBeInTheDocument();
 
     // Set up controlled promise for retry
     let retryResolve!: (val: boolean) => void;
@@ -175,22 +175,22 @@ describe('GoogleLoginButton & Server Wakeup Flow', () => {
       () => new Promise((resolve) => { retryResolve = resolve; })
     );
 
-    const retryBtn = screen.getByRole('button', { name: /retry connection/i });
+    const retryBtn = screen.getByRole('button', { name: 'Try again' });
     await act(async () => {
       fireEvent.click(retryBtn);
     });
 
     // Restores loading state
-    expect(screen.getByText(/connecting securely/i)).toBeInTheDocument();
+    expect(screen.getByText('Getting things ready')).toBeInTheDocument();
 
     await act(async () => {
       retryResolve(true);
     });
 
-    expect(screen.getByText(/backend is ready/i)).toBeInTheDocument();
+    expect(screen.getByText(/redirecting to google\.\.\./i)).toBeInTheDocument();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(400);
     });
 
     expect(window.location.href).toBe(`${API_BASE}/auth/google`);
@@ -214,7 +214,6 @@ describe('GoogleLoginButton & Server Wakeup Flow', () => {
     });
 
     expect(button).toBeDisabled();
-    // Only 1 ping loop initiated
     expect(checkCalls).toBe(1);
   });
 
@@ -237,7 +236,7 @@ describe('GoogleLoginButton & Server Wakeup Flow', () => {
     });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(400);
     });
 
     expect(window.location.href).toBe(`${API_BASE}/auth/google?redirect=/workspace&plan=pro`);
