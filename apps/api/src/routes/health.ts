@@ -9,7 +9,7 @@ const router = Router();
  *
  * Returns current service health, version, uptime, and environment.
  */
-router.get("/health", (req, res) => {
+export const healthCheckHandler = (req: any, res: any) => {
   const response: ApiResponse<HealthResponse> = {
     success: true,
     data: {
@@ -23,6 +23,14 @@ router.get("/health", (req, res) => {
   };
 
   res.json(response);
-});
+};
+
+/**
+ * GET /api/v1/health or GET /health
+ *
+ * Returns current service health, version, uptime, and environment.
+ */
+router.get("/health", healthCheckHandler);
+router.get("/", healthCheckHandler);
 
 export default router;

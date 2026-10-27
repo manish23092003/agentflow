@@ -88,6 +88,45 @@ export const api = {
       }),
   },
 
+  // Health & Server Wake-up
+  checkHealth: async (signal?: AbortSignal): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE}/health`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        cache: 'no-store',
+        signal,
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        return data?.success === true || data?.status === 'healthy' || data?.data?.status === 'healthy';
+      }
+      if (API_ORIGIN) {
+        const fallback = await fetch(`${API_ORIGIN}/health`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          cache: 'no-store',
+          signal,
+        }).catch(() => null);
+        if (fallback && fallback.ok) {
+          const data = await fallback.json().catch(() => null);
+          return data?.success === true || data?.status === 'healthy' || data?.data?.status === 'healthy';
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
   // Research Sessions
   startResearch: (goal: string, budget: number, walletAddress: string) => 
     fetchApi<ResearchSession>('/research/start', {

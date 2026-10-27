@@ -26,7 +26,16 @@ const app = express();
 // --- Security baseline ---
 app.use(helmet());
 app.use(cors({
-  origin: config.env === "development" ? "http://localhost:5173" : (config.frontendUrl || false),
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (config.env === "development") return callback(null, true);
+    const cleanOrigin = origin.replace(/\/$/, "");
+    const cleanConfigFrontend = (config.frontendUrl || "").replace(/\/$/, "");
+    if (cleanOrigin === cleanConfigFrontend || cleanOrigin.endsWith(".vercel.app")) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
   credentials: true,
   optionsSuccessStatus: 200,
 }));
@@ -42,7 +51,8 @@ import researchRouter from "./routes/research.js";
 import paymentsRouter from "./routes/payments.js";
 import authRouter from "./routes/auth.js";
 
-// --- API routes (versioned) ---
+// --- Health endpoints (versioned and root minimal health) ---
+app.use("/health", healthRouter);
 app.use("/api/v1", healthRouter);
 app.use("/api/v1", readyRouter);
 app.use("/api/v1/auth", authRouter);

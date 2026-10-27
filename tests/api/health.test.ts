@@ -51,6 +51,19 @@ describe("GET /api/v1/health", () => {
   });
 });
 
+describe("GET /health (root minimal health endpoint)", () => {
+  it("returns 200 with healthy status from /health", async () => {
+    const res = await request(app).get("/health");
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toBeDefined();
+    expect(res.body.data.status).toBe("healthy");
+    expect(res.body.data).toHaveProperty("version");
+    expect(res.body.data).toHaveProperty("uptime");
+  });
+});
+
 describe("API error handling", () => {
   it("returns 404 JSON for unknown routes", async () => {
     const res = await request(app).get("/api/v1/nonexistent");
